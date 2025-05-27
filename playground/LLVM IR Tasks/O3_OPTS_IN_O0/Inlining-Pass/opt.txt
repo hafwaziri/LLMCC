@@ -1,0 +1,8 @@
+
+1. LLVM-IR Generated with:
+clang -S -emit-llvm inlining.c -o original.ll
+
+2. Optimization Passes: Inlining and Mem2Reg
+opt -passes='inline,mem2reg' -S inlined.ll -o inlined_O0.ll
+
+3. Optimizations added back to the original.ll and renamed to modified_inlined.ll

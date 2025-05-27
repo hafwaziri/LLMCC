@@ -1,0 +1,10 @@
+1. 2 LLVM IRs generated with:
+clang -S -emit-llvm source.c -o original_O0.ll
+clang -S -O3 -emit-llvm source.c -o original_O3.ll
+
+2. Found out which optimizations done using O3:
+opt -O3 -debug-pass=Structure original_O3.ll -o /dev/null
+
+3. Removed optnone and noinline from original_O0
+4. Did inline, mem2reg pass: opt -passes='inline,mem2reg' -S original_O0.ll -o modified_O0.ll
+5. 
