@@ -15,10 +15,11 @@ RUN apt-get update && apt-get install -y \
     sudo \
     bear \
     python3 \
+    nano \
     #Debugpy for remote debugging
-    # python3-debugpy \
+    python3-debugpy \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /worker
 
-COPY build_worker.py process_package.py ./
+COPY test_framework/debian_package_tester.py package_builder/build_worker.py package_builder/process_package.py /worker/

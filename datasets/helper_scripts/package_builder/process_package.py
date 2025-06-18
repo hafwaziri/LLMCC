@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import traceback
+from debian_package_tester import test_package
 
 COMMAND_TIMEOUT = 300 #5 mins
 BUILD_TIMEOUT = 1200 #20 mins
@@ -141,6 +142,15 @@ def process_package(package, package_subdir):
             if build_returncode == 0:
                 dh_auto_build = run_dh_command("dh_auto_build", package_subdir)
                 dh_auto_test = run_dh_command("dh_auto_test", package_subdir)
+                
+                
+                
+                #TODO: Check if dh_auto_test is empty. Call the function for package testing
+                
+                if dh_auto_test != "":
+                    test_package(package.name, dh_auto_test, build_system, package_subdir)
+                    
+                
                 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)

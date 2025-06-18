@@ -22,7 +22,7 @@ check_install_package() {
 
 download_source() {
 
-    local dest_dir="../debian-sources"
+    local dest_dir="../debian-source"
     local mirror="deb.debian.org/debian"
     local architecture="source"
     local section="main,contrib,non-free"

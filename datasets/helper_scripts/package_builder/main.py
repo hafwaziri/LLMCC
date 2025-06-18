@@ -19,6 +19,7 @@ def process_package(package_dir, sub_dir):
         "docker", "run", "--rm",
         "-v", f"{package_path}:/worker/{package_name}",
         "-v", f"{sub_dir_path}:/worker/{sub_dir_name}",
+        "-p", "5678:5678",
         "-w", "/worker",
         "debian-builder",
         "python3", "build_worker.py", f"/worker/{package_name}", f"/worker/{sub_dir_name}"
@@ -30,7 +31,7 @@ def process_package(package_dir, sub_dir):
     try:
         build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode = json.loads(result.stdout)
         
-        with sqlite3.connect('../../debian_source.db') as conn_local:
+        with sqlite3.connect('../../debian_source_test.db') as conn_local:
             cursor_local = conn_local.cursor()
             cursor_local.execute("""
                 INSERT OR REPLACE INTO packages (
@@ -80,7 +81,7 @@ def main():
         sys.exit(1)
     root_dir = sys.argv[1]
     
-    conn = sqlite3.connect('../../debian_source.db')
+    conn = sqlite3.connect('../../debian_source_test.db')
     cursor = conn.cursor()
     
     cursor.execute('''
