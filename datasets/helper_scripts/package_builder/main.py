@@ -19,7 +19,7 @@ def process_package(package_dir, sub_dir):
         "docker", "run", "--rm",
         "-v", f"{package_path}:/worker/{package_name}",
         "-v", f"{sub_dir_path}:/worker/{sub_dir_name}",
-        "-p", "5678:5678",
+        # "-p", "5678:5678",
         "-w", "/worker",
         "debian-builder",
         "python3", "build_worker.py", f"/worker/{package_name}", f"/worker/{sub_dir_name}"

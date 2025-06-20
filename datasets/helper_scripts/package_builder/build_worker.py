@@ -11,9 +11,9 @@ class Package:
         self.name = name
 
 if __name__ == "__main__":
-    debugpy.listen(("0.0.0.0", 5678))
-    debugpy.wait_for_client()
-    debugpy.breakpoint()
+    # debugpy.listen(("0.0.0.0", 5678))
+    # debugpy.wait_for_client()
+    # debugpy.breakpoint()
     
     try:
         package_dir = sys.argv[1]
