@@ -122,6 +122,11 @@ def process_package(package, package_subdir):
             
             if build_returncode == 0:
                 dh_auto_test = run_dh_command("dh_auto_test", package_subdir)
+                
+                #TODO: Check if dh_auto_test is empty. Call the function for package testing
+                
+                if dh_auto_test != "":
+                    test_package(package.name, dh_auto_test, build_system, package_subdir)
         
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -142,7 +147,6 @@ def process_package(package, package_subdir):
             if build_returncode == 0:
                 dh_auto_build = run_dh_command("dh_auto_build", package_subdir)
                 dh_auto_test = run_dh_command("dh_auto_test", package_subdir)
-                
                 
                 
                 #TODO: Check if dh_auto_test is empty. Call the function for package testing
