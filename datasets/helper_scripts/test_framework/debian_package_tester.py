@@ -5,8 +5,21 @@ import shlex
 
 TEST_TIMEOUT=1200
 
+#def parse_test_results(test_results):
+
+def parse_make_test_output(test_result, test_output_file):
+    
+    #TODO: Check if tests in a specific buildsystem follow certain patterns (most probably not, because of testing frameworks),
+    #See if its better to have different cases for build-systems or testing frameworks (find a way to detect the testing framework).
+    with open(test_output_file, "a") as f:
+        f.write("\n\n\n\n\n\nTHIS IS A TEST")
+
 def test_package(package_name, dh_auto_test_command, package_build_system, package_subdir):
     
+    #TODO: Make sure common packages/tools/frameworks for testing are available in the container
+    
+    
+    #TODO: Make sure the following command is universal
     if '\trm ' in dh_auto_test_command:
         dh_auto_test_command = dh_auto_test_command.split('\trm ')[0].strip()
     dh_auto_test = shlex.split(dh_auto_test_command)
@@ -21,7 +34,7 @@ def test_package(package_name, dh_auto_test_command, package_build_system, packa
                                     capture_output=True
                                     )
         
-        with open(test_output_file, "w") as f:
+        with open(test_output_file, "a") as f:
             f.write(f"Package: {package_name}\n")
             f.write(f"Build System: {package_build_system}\n")
             f.write(f"Return Code: {test_result.returncode}\n")
@@ -30,8 +43,25 @@ def test_package(package_name, dh_auto_test_command, package_build_system, packa
             
         #TODO: Parse the test outputs for different buildsystems
         
+        if package_build_system == "make":
+            parse_make_test_output(test_result, test_output_file)
+        if package_build_system == "cmake":
+            pass
+        elif package_build_system == "meson":
+            pass
+        elif package_build_system == "autotools":
+            pass
+        elif package_build_system == "makemaker":
+            pass
+        elif package_build_system == "qmake":
+            pass
+        elif package_build_system == "unknown": #Some Unknown Buildsystems still have tests
+            pass
+            
+        
     except Exception as e:
-        with open(test_output_file, "w") as f:
+        with open(test_output_file, "a") as f:
             f.write(f"Package: {package_name}\n")
             f.write(f"Build System: {package_build_system}\n")
             f.write(f"Debian-Package-Tester-Error: {e}\n")
+            
