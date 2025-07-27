@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     sudo \
     bear \
     python3 \
+    python-is-python3 \
     nano \
     #Debugpy for remote debugging
     python3-debugpy \
