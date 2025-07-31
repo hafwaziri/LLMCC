@@ -11,41 +11,45 @@ def parse_make_test_output(test_result, test_output_file):
     
     #TODO: Check if tests in a specific buildsystem follow certain patterns (most probably not, because of testing frameworks),
     #See if its better to have different cases for build-systems or testing frameworks (find a way to detect the testing framework).
-    with open(test_output_file, "a") as f:
-        f.write("\n\n\n\n\n\nTHIS IS A TEST")
+    # with open(test_output_file, "a") as f:
+    #     f.write("\n\n\n\n\n\nTHIS IS A TEST")
+    return
 
 def test_package(package_name, dh_auto_test_command, package_build_system, package_subdir):
     
     #TODO: Make sure common packages/tools/frameworks for testing are available in the container
     
-    
-    #TODO: Make sure the following command is universal
-    if '\trm ' in dh_auto_test_command:
-        dh_auto_test_command = dh_auto_test_command.split('\trm ')[0].strip()
-    dh_auto_test = shlex.split(dh_auto_test_command)
-    
     test_output_file = os.path.join(package_subdir.path, "debian_package_tester_output.txt")
     
+    #TODO: Make sure the following command is universal (works for make, cmake, meson, autotools)
+    if '\trm ' in dh_auto_test_command:
+        dh_auto_test_command = dh_auto_test_command.split('\trm ')[0].strip()
+    # dh_auto_test =shlex.split(dh_auto_test_command)
+    
     try:
-        test_result = subprocess.run(dh_auto_test,
+        if dh_auto_test_command == "":
+            raise Exception("Test Command is empty after removing 'rm' directive")
+        
+        test_result = subprocess.run(dh_auto_test_command,
                                     cwd=package_subdir.path,
-                                    shell=False,
+                                    shell=True, #changed because of cd (for packages using cmake)
                                     timeout=TEST_TIMEOUT,
-                                    capture_output=True
+                                    capture_output=True,
+                                    text=True
                                     )
         
         with open(test_output_file, "a") as f:
             f.write(f"Package: {package_name}\n")
             f.write(f"Build System: {package_build_system}\n")
             f.write(f"Return Code: {test_result.returncode}\n")
-            f.write(f"STDOUT:\n{test_result.stdout.decode()}\n")
-            f.write(f"STDERR:\n{test_result.stderr.decode()}\n")
+            f.write(f"STDOUT:\n{test_result.stdout}\n")
+            f.write(f"STDERR:\n{test_result.stderr}\n")
             
         #TODO: Parse the test outputs for different buildsystems
         
         if package_build_system == "make":
             parse_make_test_output(test_result, test_output_file)
-        if package_build_system == "cmake":
+        elif package_build_system == "cmake":
             pass
         elif package_build_system == "meson":
             pass

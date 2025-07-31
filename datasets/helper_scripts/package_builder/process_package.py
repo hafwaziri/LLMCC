@@ -60,6 +60,7 @@ def detect_build_system(output_txt):
         return "make"
     return "unknown"
 
+#TODO: Move this to the Dockerfile
 def update_apt_sources():
     """
     Updates the APT sources list with Debian bookworm repositories and refreshes the package lists.
