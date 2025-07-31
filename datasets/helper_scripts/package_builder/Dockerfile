@@ -24,16 +24,16 @@ RUN apt-get update && apt-get install -y \
     python3-pytest \
     python-is-python3 \
     python2.7 \
-    gnustep-devel \
-    gnustep-make \
-    gnustep-common \
-    libobjc-dev \
+    #gnustep-devel \
+    #gnustep-make \
+    #gnustep-common \
+    #libobjc-dev \
     #Debugpy for remote debugging
     python3-debugpy \
     && rm -rf /var/lib/apt/lists/*
 
 # Install errcheck Go static analysis tool, for the testing framework
-RUN go install github.com/kisielk/errcheck@latest
+RUN go install github.com/kisielk/errcheck@v1.7.0
 
 WORKDIR /worker
 
