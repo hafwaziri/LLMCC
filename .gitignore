@@ -3,3 +3,5 @@ debian-source/
 LLM_Comp/
 testing/
 .vscode/
+debian_source_test.db
+
