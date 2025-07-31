@@ -21,7 +21,7 @@ def test_package(package_name, dh_auto_test_command, package_build_system, packa
     
     test_output_file = os.path.join(package_subdir.path, "debian_package_tester_output.txt")
     
-    #TODO: Make sure the following command is universal (works for make, cmake, meson, autotools)
+    #TODO: Make sure the following command is universal (works for make, cmake, meson, autotools, makemaker)
     if '\trm ' in dh_auto_test_command:
         dh_auto_test_command = dh_auto_test_command.split('\trm ')[0].strip()
     # dh_auto_test =shlex.split(dh_auto_test_command)
