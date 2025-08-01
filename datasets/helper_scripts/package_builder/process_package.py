@@ -100,7 +100,10 @@ def process_package(package, package_subdir):
     dh_auto_test = ""
     build_stderr = ""
     build_returncode = 1
-
+    test_stdout = ""
+    test_stderr = ""
+    test_returncode = 3 #Custom return code 3 for when tests are not available, or exceptions occur
+    
     try:
         dh_auto_config = run_dh_command("dh_auto_configure", package_subdir)
         
@@ -127,7 +130,8 @@ def process_package(package, package_subdir):
                 #TODO: Check if dh_auto_test is empty. Call the function for package testing
                 
                 if dh_auto_test != "":
-                    test_package(package.name, dh_auto_test, build_system, package_subdir)
+                    test_stdout, test_stderr, test_returncode = test_package(package.name, dh_auto_test, build_system, 
+                                                                             package_subdir)
         
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -153,7 +157,8 @@ def process_package(package, package_subdir):
                 #TODO: Check if dh_auto_test is empty. Call the function for package testing
                 
                 if dh_auto_test != "":
-                    test_package(package.name, dh_auto_test, build_system, package_subdir)
+                    test_stdout, test_stderr, test_returncode = test_package(package.name, dh_auto_test, 
+                                                                             build_system, package_subdir)
                     
                 
                 
@@ -163,4 +168,5 @@ def process_package(package, package_subdir):
         build_stderr = f"PROCESS_ERROR: {str(e)}"
         build_returncode = 1
     
-    return build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode
+    return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
+            test_stdout, test_stderr, test_returncode)

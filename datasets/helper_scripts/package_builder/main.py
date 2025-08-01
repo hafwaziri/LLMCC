@@ -29,16 +29,18 @@ def process_package(package_dir, sub_dir):
     result = subprocess.run(docker_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     
     try:
-        build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode = json.loads(result.stdout)
+        (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
+         test_stdout, test_stderr, test_returncode) = json.loads(result.stdout)
         
         with sqlite3.connect('../../debian_source_test.db') as conn_local:
             cursor_local = conn_local.cursor()
             cursor_local.execute("""
                 INSERT OR REPLACE INTO packages (
                     name, build_system, dh_auto_configure, dh_auto_build, dh_auto_test,
-                    build_stderr, build_return_code
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode))
+                    build_stderr, build_return_code, test_stdout, test_stderr, test_returncode
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test, 
+                  build_stderr, build_returncode, test_stdout, test_stderr, test_returncode))
             conn_local.commit()
             
         return True
@@ -92,7 +94,10 @@ def main():
         dh_auto_build TEXT,
         dh_auto_test TEXT,
         build_stderr TEXT,
-        build_return_code INTEGER
+        build_return_code INTEGER,
+        test_stdout TEXT,
+        test_stderr TEXT,
+        test_returncode INTEGER
     )
     ''')
     conn.commit()
