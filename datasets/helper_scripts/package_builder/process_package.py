@@ -4,6 +4,8 @@ import subprocess
 import traceback
 from debian_package_tester import test_package
 
+#TODO: Remove Magic Numbers
+
 COMMAND_TIMEOUT = 300 #5 mins
 BUILD_TIMEOUT = 1200 #20 mins
 BUILDDEP_TIMEOUT = 600 #10 mins
@@ -103,6 +105,9 @@ def process_package(package, package_subdir):
     test_stdout = ""
     test_stderr = ""
     test_returncode = 3 #Custom return code 3 for when tests are not available, or exceptions occur
+    test_detected = 0 #0 for no detection, 1 for detection
+    testing_framework = ""
+
     
     try:
         dh_auto_config = run_dh_command("dh_auto_configure", package_subdir)
@@ -130,8 +135,9 @@ def process_package(package, package_subdir):
                 #TODO: Check if dh_auto_test is empty. Call the function for package testing
                 
                 if dh_auto_test != "":
-                    test_stdout, test_stderr, test_returncode = test_package(package.name, dh_auto_test, build_system, 
-                                                                             package_subdir)
+                    (test_stdout, test_stderr, test_returncode, test_detected, 
+                     testing_framework) = test_package(package.name, dh_auto_test, 
+                                                       build_system, package_subdir)
         
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -157,8 +163,9 @@ def process_package(package, package_subdir):
                 #TODO: Check if dh_auto_test is empty. Call the function for package testing
                 
                 if dh_auto_test != "":
-                    test_stdout, test_stderr, test_returncode = test_package(package.name, dh_auto_test, 
-                                                                             build_system, package_subdir)
+                    (test_stdout, test_stderr, test_returncode, test_detected, 
+                     testing_framework) = test_package(package.name, dh_auto_test, 
+                                                       build_system, package_subdir)
                     
                 
                 
@@ -169,4 +176,4 @@ def process_package(package, package_subdir):
         build_returncode = 1
     
     return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
-            test_stdout, test_stderr, test_returncode)
+            test_stdout, test_stderr, test_returncode, test_detected, testing_framework)

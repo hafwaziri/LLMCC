@@ -37,4 +37,4 @@ RUN go install github.com/kisielk/errcheck@v1.7.0
 
 WORKDIR /worker
 
-COPY test_framework/debian_package_tester.py package_builder/build_worker.py package_builder/process_package.py /worker/
+COPY test_framework/debian_package_tester.py package_builder/build_worker.py package_builder/process_package.py test_framework/test_output_parser.py /worker/

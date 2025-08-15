@@ -19,6 +19,7 @@ def process_package(package_dir, sub_dir):
         "docker", "run", "--rm",
         "-v", f"{package_path}:/worker/{package_name}",
         "-v", f"{sub_dir_path}:/worker/{sub_dir_name}",
+        "-v", "../test_framework/tests/output_diff/:/worker/package_tester_output_diff/",
         # "-p", "5678:5678",
         "-w", "/worker",
         "debian-builder",
@@ -30,17 +31,18 @@ def process_package(package_dir, sub_dir):
     
     try:
         (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
-         test_stdout, test_stderr, test_returncode) = json.loads(result.stdout)
+         test_stdout, test_stderr, test_returncode, test_detected, testing_framework) = json.loads(result.stdout)
         
         with sqlite3.connect('../../debian_source_test.db') as conn_local:
             cursor_local = conn_local.cursor()
             cursor_local.execute("""
                 INSERT OR REPLACE INTO packages (
                     name, build_system, dh_auto_configure, dh_auto_build, dh_auto_test,
-                    build_stderr, build_return_code, test_stdout, test_stderr, test_returncode
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    build_stderr, build_return_code, test_stdout, test_stderr, test_returncode,
+                    test_detected, testing_framework
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test, 
-                  build_stderr, build_returncode, test_stdout, test_stderr, test_returncode))
+                  build_stderr, build_returncode, test_stdout, test_stderr, test_returncode, test_detected, testing_framework))
             conn_local.commit()
             
         return True
@@ -97,7 +99,9 @@ def main():
         build_return_code INTEGER,
         test_stdout TEXT,
         test_stderr TEXT,
-        test_returncode INTEGER
+        test_returncode INTEGER,
+        test_detected INTEGER,
+        testing_framework TEXT
     )
     ''')
     conn.commit()

@@ -3,7 +3,7 @@ import sys
 import os
 import shlex
 import difflib
-#import test_output_parser
+import test_output_parser
 
 #TODO: Remove Magic Numbers
 
@@ -48,7 +48,7 @@ def test_package(package_name, dh_auto_test_command, package_build_system, packa
 
         #Run Test 2x again, first for sanity check then after injecting the modified LLVM IR (#TODO: Injecting part)
         if test_returncode != 3:
-            #test_detected, framework = test_output_parser.parser(test_stdout, test_stderr)
+            test_detected, framework = test_output_parser.parser(test_stdout, test_stderr)
             
             if test_detected == 1:    
                 test_rerun_result = run_dh_auto_test_command(dh_auto_test_command, package_subdir)
