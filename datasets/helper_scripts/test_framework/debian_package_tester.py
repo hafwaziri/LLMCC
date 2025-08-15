@@ -2,28 +2,35 @@ import subprocess
 import sys
 import os
 import shlex
+import difflib
+#import test_output_parser
+
+#TODO: Remove Magic Numbers
 
 TEST_TIMEOUT=1200
 
-#def parse_test_results(test_results):
-
-def parse_make_test_output(test_result, test_output_file):
-    
-    #TODO: Check if tests in a specific buildsystem follow certain patterns (most probably not, because of testing frameworks),
-    #See if its better to have different cases for build-systems or testing frameworks (find a way to detect the testing framework).
-    # with open(test_output_file, "a") as f:
-    #     f.write("\n\n\n\n\n\nTHIS IS A TEST")
-    return
+def run_dh_auto_test_command(dh_auto_test_command, package_subdir):
+    test_result = subprocess.run(dh_auto_test_command,
+                                    cwd=package_subdir.path,
+                                    shell=True, #changed because of cd (for packages using cmake)
+                                    timeout=TEST_TIMEOUT,
+                                    capture_output=True,
+                                    text=True
+                                    )
+    return test_result
 
 def test_package(package_name, dh_auto_test_command, package_build_system, package_subdir):
     
     test_stdout = ""
     test_stderr = ""
     test_returncode = 3
+    test_detected = 0
+    framework = ""
         
     #TODO: Make sure common packages/tools/frameworks for testing are available in the container
+    #python3-venv
     
-    test_output_file = os.path.join(package_subdir.path, "debian_package_tester_output.txt")
+    #test_output_file = os.path.join(package_subdir.path, "debian_package_tester_output.txt")
     
     if '\trm ' in dh_auto_test_command:
         dh_auto_test_command = dh_auto_test_command.split('\trm ')[0].strip()
@@ -33,52 +40,43 @@ def test_package(package_name, dh_auto_test_command, package_build_system, packa
         if dh_auto_test_command == "":
             raise Exception("Test Command is empty after removing 'rm' directive")
         
-        test_result = subprocess.run(dh_auto_test_command,
-                                    cwd=package_subdir.path,
-                                    shell=True, #changed because of cd (for packages using cmake)
-                                    timeout=TEST_TIMEOUT,
-                                    capture_output=True,
-                                    text=True
-                                    )
-        
-        with open(test_output_file, "a") as f:
-            f.write(f"Package: {package_name}\n")
-            f.write(f"Build System: {package_build_system}\n")
-            f.write(f"Return Code: {test_result.returncode}\n")
-            f.write(f"STDOUT:\n{test_result.stdout}\n")
-            f.write(f"STDERR:\n{test_result.stderr}\n")
-        
+        test_result = run_dh_auto_test_command(dh_auto_test_command, package_subdir)
         
         test_stdout = test_result.stdout
         test_stderr = test_result.stderr
         test_returncode = test_result.returncode
+
+        #Run Test 2x again, first for sanity check then after injecting the modified LLVM IR (#TODO: Injecting part)
+        if test_returncode != 3:
+            #test_detected, framework = test_output_parser.parser(test_stdout, test_stderr)
             
-        #TODO: Parse the test outputs for different buildsystems
-        
-        if package_build_system == "make":
-            parse_make_test_output(test_result, test_output_file)
-        elif package_build_system == "cmake":
-            pass
-        elif package_build_system == "meson":
-            pass
-        elif package_build_system == "autotools":
-            pass
-        elif package_build_system == "makemaker":
-            pass
-        elif package_build_system == "qmake":
-            pass
-        elif package_build_system == "unknown": #Some Unknown Buildsystems still have tests
-            pass
+            if test_detected == 1:    
+                test_rerun_result = run_dh_auto_test_command(dh_auto_test_command, package_subdir)
+                
+                stdout_diff = '\n'.join(difflib.unified_diff(
+                    test_stdout.splitlines(keepends=True),
+                    test_rerun_result.stdout.splitlines(keepends=True),
+                    fromfile="original_stdout",
+                    tofile="modified_stdout",
+                    lineterm=''
+                ))
+                stderr_diff = '\n'.join(difflib.unified_diff(
+                    test_stderr.splitlines(keepends=True),
+                    test_rerun_result.stderr.splitlines(keepends=True),
+                    fromfile='original_stderr', 
+                    tofile='modified_stderr',
+                    lineterm=''
+                ))
+                
+                with open(f"package_tester_output_diff/{package_name}_results.txt", "a") as f:
+                    f.write(f"Original Return Code {test_returncode}, Modified: {test_rerun_result.returncode} \n\n\n")
+                    f.write(f"STDOUT DIFF:\n{stdout_diff}\n\n")
+                    f.write(f"STDERR DIFF:\n{stderr_diff}\n\n")
             
         
     except Exception as e:
-        with open(test_output_file, "a") as f:
-            f.write(f"Package: {package_name}\n")
-            f.write(f"Build System: {package_build_system}\n")
-            f.write(f"Debian-Package-Tester-Error: {e}\n")
         
         test_stderr = f"Test_Exception: {str(e)}"
         test_returncode = 3
     
-    return test_stdout, test_stderr, test_returncode
-            
+    return test_stdout, test_stderr, test_returncode, test_detected, framework
