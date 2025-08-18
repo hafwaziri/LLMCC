@@ -33,6 +33,21 @@ if __name__ == "__main__":
         print(f"Exception occurred: {str(e)}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         
-        error_result = ("unknown", "", "", "", str(e), 1)
+        error_result = (
+            "unknown",     # build_system
+            "",           # dh_auto_config
+            "",           # dh_auto_build
+            "",           # dh_auto_test
+            str(e),       # build_stderr
+            1,            # build_returncode
+            "",           # test_stdout
+            "",           # test_stderr
+            1,            # test_returncode
+            0,            # test_detected
+            None,         # testing_framework
+            "",           # stdout_diff
+            "",           # stderr_diff
+            0             # package_viable_for_test_dataset
+        )
         json.dump(error_result, sys.stdout)
         sys.stdout.flush()

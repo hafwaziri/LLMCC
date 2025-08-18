@@ -31,7 +31,8 @@ def process_package(package_dir, sub_dir):
     
     try:
         (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
-         test_stdout, test_stderr, test_returncode, test_detected, testing_framework) = json.loads(result.stdout)
+         test_stdout, test_stderr, test_returncode, test_detected, testing_framework, 
+         test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset) = json.loads(result.stdout)
         
         with sqlite3.connect('../../debian_source_test.db') as conn_local:
             cursor_local = conn_local.cursor()
@@ -39,8 +40,8 @@ def process_package(package_dir, sub_dir):
                 INSERT OR REPLACE INTO packages (
                     name, build_system, dh_auto_configure, dh_auto_build, dh_auto_test,
                     build_stderr, build_return_code, test_stdout, test_stderr, test_returncode,
-                    test_detected, testing_framework
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    test_detected, testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test, 
                   build_stderr, build_returncode, test_stdout, test_stderr, test_returncode, test_detected, testing_framework))
             conn_local.commit()
@@ -101,7 +102,10 @@ def main():
         test_stderr TEXT,
         test_returncode INTEGER,
         test_detected INTEGER,
-        testing_framework TEXT
+        testing_framework TEXT,
+        test_stdout_diff TEXT,
+        test_stderr_diff TEXT,
+        package_viable_for_test_dataset INTEGER
     )
     ''')
     conn.commit()
