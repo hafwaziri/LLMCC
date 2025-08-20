@@ -3,14 +3,34 @@ import sys
 import os
 import shlex
 import difflib
+import re
 import test_output_parser
 
 #TODO: Remove Magic Numbers
 
 TEST_TIMEOUT=1200
 
+TEST_OUTPUT_CLEANING_PATTERNS = [
+    r"\b\d+ms\b",
+    r"\b\d+\.\d+\s+sec\b",
+    r"\b\d+\.\d+s\b",
+    r"\b\d+\s+milliseconds\b",
+    r"\b\d+\s+ms\b",
+    r"\b\d+\.\d+\s+seconds\b",
+    r"\b\d+\.\d+e[+-]\d+\s+\w+/\w+\b",
+    r"\b\d+\s+wallclock\s+secs\s+\([^)]+\)",
+    r"--\s+timestamp\s+:\s+\[\d+\]",
+    r"total load average:.*?'",
+    r"\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}"
+]
+
 def clean_test_output(test_output):
-    return test_output
+    cleaned = test_output
+
+    for pattern in TEST_OUTPUT_CLEANING_PATTERNS:
+        cleaned = re.sub(pattern, "", cleaned)
+
+    return cleaned
 
 def run_dh_auto_test_command(dh_auto_test_command, package_subdir):
     test_result = subprocess.run(dh_auto_test_command,
@@ -28,25 +48,27 @@ def handle_test_rerun_and_diff(test_result, dh_auto_test_command, package_subdir
     if test_rerun_result.returncode != test_returncode:
         return "", "", 0
     
-    test_result = clean_test_output(test_result)
-    test_rerun_result = clean_test_output(test_rerun_result)
+    original_stdout_cleaned = clean_test_output(test_result.stdout)
+    original_stderr_cleaned = clean_test_output(test_result.stderr)
+    rerun_stdout_cleaned = clean_test_output(test_rerun_result.stdout)
+    rerun_stderr_cleaned = clean_test_output(test_rerun_result.stderr)
     
-    stdout_same = test_result.stdout == test_rerun_result.stdout
-    stderr_same = test_result.stderr == test_rerun_result.stderr
+    stdout_same = original_stdout_cleaned == rerun_stdout_cleaned
+    stderr_same = original_stderr_cleaned == rerun_stderr_cleaned
     
     if stdout_same and stderr_same:
         return "", "", 1
     
     stdout_diff = '\n'.join(difflib.unified_diff(
-        test_stdout.splitlines(keepends=True),
-        test_rerun_result.stdout.splitlines(keepends=True),
+        original_stdout_cleaned.splitlines(keepends=True),
+        rerun_stdout_cleaned.splitlines(keepends=True),
         fromfile="original_stdout",
         tofile="modified_stdout",
         lineterm=''
     ))
     stderr_diff = '\n'.join(difflib.unified_diff(
-        test_stderr.splitlines(keepends=True),
-        test_rerun_result.stderr.splitlines(keepends=True),
+        original_stderr_cleaned.splitlines(keepends=True),
+        rerun_stderr_cleaned.splitlines(keepends=True),
         fromfile='original_stderr', 
         tofile='modified_stderr',
         lineterm=''
@@ -91,12 +113,12 @@ def test_package(package_name, dh_auto_test_command, package_build_system, packa
 
         #Run Test 2x again, first for sanity check then after injecting the modified LLVM IR (#TODO: Injecting part)
         if test_returncode == 3:
-            return test_stdout, test_stderr, test_returncode, test_detected, framework
+            return test_stdout, test_stderr, test_returncode, test_detected, framework, "", "", 0
             
         test_detected, framework = test_output_parser.parser(test_stdout, test_stderr)
 
         if test_detected != 1:
-            return test_stdout, test_stderr, test_returncode, test_detected, framework
+            return test_stdout, test_stderr, test_returncode, test_detected, framework, "", "", 0
 
         stdout_diff, stderr_diff, package_viable_for_test_dataset = handle_test_rerun_and_diff(test_result, 
                                                                                                dh_auto_test_command, 
