@@ -109,6 +109,17 @@ def main():
         package_viable_for_test_dataset INTEGER
     )
     ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS source_files (
+        file_path TEXT,
+        package_name TEXT,
+        compilation_command TEXT,
+        PRIMARY KEY (package_name, file_path),
+        FOREIGN KEY (package_name) REFERENCES packages (name)
+    )
+    ''')
+
     conn.commit()
     conn.close()
     
