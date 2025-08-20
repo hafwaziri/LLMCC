@@ -43,7 +43,8 @@ def process_package(package_dir, sub_dir):
                     test_detected, testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test, 
-                  build_stderr, build_returncode, test_stdout, test_stderr, test_returncode, test_detected, testing_framework))
+                  build_stderr, build_returncode, test_stdout, test_stderr, test_returncode, test_detected, 
+                  testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset))
             conn_local.commit()
             
         return True
