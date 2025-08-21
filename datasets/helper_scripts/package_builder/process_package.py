@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import traceback
+import json
 from debian_package_tester import test_package
 
 #TODO: Remove Magic Numbers
@@ -94,8 +95,30 @@ deb-src https://deb.debian.org/debian bookworm-updates main non-free-firmware"""
         print(f"Failed to update sources: {e}", file=sys.stderr)
         return False
         
+def extract_compilation_commands(package_subdir):
+    
+    compile_commands_path = os.path.join(package_subdir, "compile_commands.json")
 
-
+    if not os.path.exists(compile_commands_path):
+        return []
+    
+    with open(compile_commands_path, 'r') as f:
+        commands = json.load(f)
+    
+    compilation_data = []
+    
+    for cmd in commands:
+        file_path = cmd.get('file', '')
+        if file_path.endswith(('.c', '.cpp', '.cc', '.cxx', '.C')):
+            compilation_info = {
+                'source_file': file_path,
+                'compiler_flags': cmd.get('arguments', []),
+                'output_file': cmd.get('output', '')
+            }
+            compilation_data.append(compilation_info)
+            
+    return compilation_data
+    
 def process_package(package, package_subdir):
     build_system = "unknown"
     dh_auto_build = ""
@@ -110,6 +133,7 @@ def process_package(package, package_subdir):
     stdout_diff = ""
     stderr_diff = ""
     package_viable_for_test_dataset = 0
+    compilation_data = []
 
     
     try:
@@ -144,6 +168,9 @@ def process_package(package, package_subdir):
                                                                      dh_auto_test, 
                                                                      build_system, 
                                                                      package_subdir)
+                # Extract the Compilation Commands for the C and C++ Files
+                
+                compilation_data = extract_compilation_commands(package_subdir.path)
         
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -176,7 +203,9 @@ def process_package(package, package_subdir):
                                                                      build_system, 
                                                                      package_subdir)
                     
+                # Extract the Compilation Commands for the C and C++ Files
                 
+                compilation_data = extract_compilation_commands(package_subdir.path)
                 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
@@ -186,4 +215,4 @@ def process_package(package, package_subdir):
     
     return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
             test_stdout, test_stderr, test_returncode, test_detected, testing_framework, stdout_diff, 
-            stderr_diff, package_viable_for_test_dataset)
+            stderr_diff, package_viable_for_test_dataset, compilation_data)

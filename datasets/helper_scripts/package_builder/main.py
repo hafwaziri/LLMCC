@@ -32,7 +32,7 @@ def process_package(package_dir, sub_dir):
     try:
         (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
          test_stdout, test_stderr, test_returncode, test_detected, testing_framework, 
-         test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset) = json.loads(result.stdout)
+         test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset, compilation_data) = json.loads(result.stdout)
         
         with sqlite3.connect('../../debian_source_test.db') as conn_local:
             cursor_local = conn_local.cursor()
@@ -46,6 +46,18 @@ def process_package(package_dir, sub_dir):
                   build_stderr, build_returncode, test_stdout, test_stderr, test_returncode, test_detected, 
                   testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset))
             conn_local.commit()
+            
+            for comp_info in compilation_data:
+                cursor_local.execute("""
+                    INSERT OR REPLACE INTO source_files (
+                        file_path, package_name, compilation_command, output_file
+                    ) VALUES (?, ?, ?, ?)
+                """, (
+                    comp_info['source_file'],
+                    package_name,
+                    ' '.join(comp_info['compiler_flags']),
+                    comp_info['output_file']
+                ))
             
         return True
     except json.JSONDecodeError as e:
@@ -115,6 +127,7 @@ def main():
         file_path TEXT,
         package_name TEXT,
         compilation_command TEXT,
+        output_file TEXT,
         PRIMARY KEY (package_name, file_path),
         FOREIGN KEY (package_name) REFERENCES packages (name)
     )
