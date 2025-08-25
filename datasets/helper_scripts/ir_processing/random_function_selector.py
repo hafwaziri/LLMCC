@@ -18,12 +18,13 @@ def random_function_selector(functions, random_seed=None):
 
     if random_seed == None:
         random_seed = 42
-    
+
     random.seed(random_seed)
-    
-    random_function = random.choice(functions)
-    
-    return random_function
+
+    try:
+        return random.choice(functions)
+    except Exception as e:
+        print(f"Random Function Extractor error: {e}")
 
 if __name__ == "__main__":
 
