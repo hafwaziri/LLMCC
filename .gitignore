@@ -4,4 +4,4 @@ LLM_Comp/
 testing/
 .vscode/
 debian_source_test.db
-
+__pycache__/
