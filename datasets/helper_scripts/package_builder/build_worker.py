@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # debugpy.listen(("0.0.0.0", 5678))
     # debugpy.wait_for_client()
     # debugpy.breakpoint()
-    
+
     try:
         package_dir = sys.argv[1]
         sub_dir = sys.argv[2]
@@ -47,7 +47,8 @@ if __name__ == "__main__":
             None,         # testing_framework
             "",           # stdout_diff
             "",           # stderr_diff
-            0             # package_viable_for_test_dataset
+            0,             # package_viable_for_test_dataset,
+            []            # compilation_data
         )
         json.dump(error_result, sys.stdout)
         sys.stdout.flush()

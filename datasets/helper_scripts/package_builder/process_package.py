@@ -4,6 +4,11 @@ import subprocess
 import traceback
 import json
 from debian_package_tester import test_package
+from function_extractor import extract_function_from_source
+from random_function_selector import random_function_selector
+from IR_extractor import generate_ir_for_source_file
+from IR_extractor import generate_ir_output_command
+
 
 #TODO: Remove Magic Numbers
 
@@ -39,7 +44,7 @@ def build_package(package):
                                 shell=False,
                                 timeout=BUILD_TIMEOUT
                                 )
-        
+
         return result.stderr, result.returncode
     except subprocess.TimeoutExpired:
         return "BUILD_TIMEOUT", 1
@@ -48,7 +53,7 @@ def build_package(package):
 
 def detect_build_system(output_txt):
     output_lower = output_txt.lower()
-    
+
     if "cmake" in output_lower:
         return "cmake"
     elif "meson" in output_lower:
@@ -81,11 +86,11 @@ deb-src https://deb.debian.org/debian bookworm-updates main non-free-firmware"""
     try:
         with open('/tmp/custom_sources.list', 'w') as f:
             f.write(sources_content)
-        
+
         subprocess.run(["sudo", "cp", "/tmp/custom_sources.list", "/etc/apt/sources.list"], 
                      check=True,
                      timeout=COMMAND_TIMEOUT)
-        
+
         subprocess.run(["sudo", "apt-get", "update"], 
                      check=True,
                      timeout=COMMAND_TIMEOUT,
@@ -94,31 +99,33 @@ deb-src https://deb.debian.org/debian bookworm-updates main non-free-firmware"""
     except Exception as e:
         print(f"Failed to update sources: {e}", file=sys.stderr)
         return False
-        
+
 def extract_compilation_commands(package_subdir):
-    
+
     compile_commands_path = os.path.join(package_subdir, "compile_commands.json")
 
     if not os.path.exists(compile_commands_path):
         return []
-    
+
     with open(compile_commands_path, 'r') as f:
         commands = json.load(f)
-    
+
     compilation_data = []
-    
+
     for cmd in commands:
         file_path = cmd.get('file', '')
         if file_path.endswith(('.c', '.cpp', '.cc', '.cxx', '.C')):
             compilation_info = {
                 'source_file': file_path,
                 'compiler_flags': cmd.get('arguments', []),
-                'output_file': cmd.get('output', '')
+                'output_file': cmd.get('output', ''),
+                'directory': cmd.get('directory', '')
             }
             compilation_data.append(compilation_info)
-            
+
     return compilation_data
-    
+
+
 def process_package(package, package_subdir):
     build_system = "unknown"
     dh_auto_build = ""
@@ -135,16 +142,16 @@ def process_package(package, package_subdir):
     package_viable_for_test_dataset = 0
     compilation_data = []
 
-    
+
     try:
         dh_auto_config = run_dh_command("dh_auto_configure", package_subdir)
-        
+
         if not dh_auto_config:
             dh_auto_build = run_dh_command("dh_auto_build", package_subdir)
             build_system = detect_build_system(dh_auto_build)
-            
+
             update_apt_sources()
-            
+
             try:
                 subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"], 
                              cwd=package_subdir.path, 
@@ -153,30 +160,45 @@ def process_package(package, package_subdir):
                              capture_output=True)
             except Exception as e:
                 print(f"Build-dep failed: {e}", file=sys.stderr)
-            
+
             build_stderr, build_returncode = build_package(package_subdir)
-            
+
             if build_returncode == 0:
                 dh_auto_test = run_dh_command("dh_auto_test", package_subdir)
-                
+
                 #TODO: Check if dh_auto_test is empty. Call the function for package testing
-                
+
                 if dh_auto_test != "":
-                    (test_stdout, test_stderr, test_returncode, test_detected, 
-                     testing_framework, stdout_diff, stderr_diff, 
-                     package_viable_for_test_dataset) = test_package(package.name, 
-                                                                     dh_auto_test, 
-                                                                     build_system, 
+                    (test_stdout, test_stderr, test_returncode, test_detected,
+                     testing_framework, stdout_diff, stderr_diff,
+                     package_viable_for_test_dataset) = test_package(package.name,
+                                                                     dh_auto_test,
+                                                                     build_system,
                                                                      package_subdir)
                 # Extract the Compilation Commands for the C and C++ Files
-                
+
                 compilation_data = extract_compilation_commands(package_subdir.path)
-        
+
+                for source_file in compilation_data:
+                    if not os.path.exists(source_file["source_file"]) or not os.path.exists(source_file["directory"]):
+                        source_file["functions"] = None
+                        source_file["random_function"] = None
+                        source_file["llvm_ir"] = None
+                        continue
+
+                    functions = extract_function_from_source(source_file["source_file"])
+                    random_function = random_function_selector(functions)
+                    source_file["functions"] = functions
+                    source_file["random_function"] = random_function
+                    compilation_command = generate_ir_output_command(source_file["compiler_flags"])
+                    source_ir = generate_ir_for_source_file(source_file["directory"], compilation_command)
+                    source_file["llvm_ir"] = source_ir.stdout
+
         else:
             build_system = detect_build_system(dh_auto_config)
-            
+
             update_apt_sources()
-            
+
             try:
                 subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"], 
                              cwd=package_subdir.path, 
@@ -185,34 +207,48 @@ def process_package(package, package_subdir):
                              capture_output=True)
             except Exception as e:
                 print(f"Build-dep failed: {e}", file=sys.stderr)
-            
+
             build_stderr, build_returncode = build_package(package_subdir)
-            
+
             if build_returncode == 0:
                 dh_auto_build = run_dh_command("dh_auto_build", package_subdir)
                 dh_auto_test = run_dh_command("dh_auto_test", package_subdir)
-                
-                
+
                 #TODO: Check if dh_auto_test is empty. Call the function for package testing
-                
+
                 if dh_auto_test != "":
-                    (test_stdout, test_stderr, test_returncode, test_detected, 
-                     testing_framework, stdout_diff, stderr_diff, 
-                     package_viable_for_test_dataset) = test_package(package.name, 
-                                                                     dh_auto_test, 
-                                                                     build_system, 
+                    (test_stdout, test_stderr, test_returncode, test_detected,
+                     testing_framework, stdout_diff, stderr_diff,
+                     package_viable_for_test_dataset) = test_package(package.name,
+                                                                     dh_auto_test,
+                                                                     build_system,
                                                                      package_subdir)
-                    
+
                 # Extract the Compilation Commands for the C and C++ Files
-                
+
                 compilation_data = extract_compilation_commands(package_subdir.path)
-                
+
+                for source_file in compilation_data:
+                    if not os.path.exists(source_file["source_file"]) or not os.path.exists(source_file["directory"]):
+                        source_file["functions"] = None
+                        source_file["random_function"] = None
+                        source_file["llvm_ir"] = None
+                        continue
+                    
+                    functions = extract_function_from_source(source_file["source_file"])
+                    random_function = random_function_selector(functions)
+                    source_file["functions"] = functions
+                    source_file["random_function"] = random_function
+                    compilation_command = generate_ir_output_command(source_file["compiler_flags"])
+                    source_ir = generate_ir_for_source_file(source_file["directory"], compilation_command)
+                    source_file["llvm_ir"] = source_ir.stdout
+
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         build_stderr = f"PROCESS_ERROR: {str(e)}"
         build_returncode = 1
-    
-    return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
-            test_stdout, test_stderr, test_returncode, test_detected, testing_framework, stdout_diff, 
+
+    return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode,
+            test_stdout, test_stderr, test_returncode, test_detected, testing_framework, stdout_diff,
             stderr_diff, package_viable_for_test_dataset, compilation_data)

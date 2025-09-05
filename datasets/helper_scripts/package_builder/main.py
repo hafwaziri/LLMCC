@@ -46,23 +46,29 @@ def process_package(package_dir, sub_dir):
                   build_stderr, build_returncode, test_stdout, test_stderr, test_returncode, test_detected, 
                   testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset))
             conn_local.commit()
-            
+
             for comp_info in compilation_data:
                 cursor_local.execute("""
                     INSERT OR REPLACE INTO source_files (
-                        file_path, package_name, compilation_command, output_file
-                    ) VALUES (?, ?, ?, ?)
+                        file_path, package_name, compilation_command, output_file, functions, random_function, LLVM_IR
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
                     ' '.join(comp_info['compiler_flags']),
-                    comp_info['output_file']
+                    comp_info['output_file'],
+                    json.dumps(comp_info['functions']),
+                    json.dumps(comp_info['random_function']),
+                    comp_info['llvm_ir']
                 ))
             
         return True
     except json.JSONDecodeError as e:
         print(f"JSON decode error for {package_name}: {e}")
         print(f"Raw output: {result.stdout!r}")
+        return False
+    except Exception as e:
+        print(f"Exception in package: {package_name}: {e}")
         return False
 
 def traverse_dir(root):
@@ -128,6 +134,9 @@ def main():
         package_name TEXT,
         compilation_command TEXT,
         output_file TEXT,
+        functions TEXT,
+        random_function TEXT,
+        LLVM_IR TEXT,
         PRIMARY KEY (package_name, file_path),
         FOREIGN KEY (package_name) REFERENCES packages (name)
     )

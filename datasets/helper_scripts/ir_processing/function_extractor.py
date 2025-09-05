@@ -50,7 +50,7 @@ def extract_function_from_source(source_file):
         print(f"Function Extractor error: {e}")
 
 if __name__ == "__main__":
-    source_file_path = ""
+    source_file_path = "./test.c"
 
     functions = extract_function_from_source(source_file_path)
 

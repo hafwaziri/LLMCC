@@ -22,7 +22,9 @@ def random_function_selector(functions, random_seed=None):
     random.seed(random_seed)
 
     try:
-        return random.choice(functions)
+        if functions:
+            return random.choice(functions)
+        return None
     except Exception as e:
         print(f"Random Function Extractor error: {e}")
 
