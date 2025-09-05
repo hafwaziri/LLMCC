@@ -50,8 +50,9 @@ def process_package(package_dir, sub_dir):
             for comp_info in compilation_data:
                 cursor_local.execute("""
                     INSERT OR REPLACE INTO source_files (
-                        file_path, package_name, compilation_command, output_file, functions, random_function, LLVM_IR
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        file_path, package_name, compilation_command, output_file, functions, random_function, 
+                        IR_generation_return_code, LLVM_IR, IR_generation_stderr
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
@@ -59,9 +60,11 @@ def process_package(package_dir, sub_dir):
                     comp_info['output_file'],
                     json.dumps(comp_info['functions']),
                     json.dumps(comp_info['random_function']),
-                    comp_info['llvm_ir']
+                    comp_info['ir_generation_return_code'],
+                    comp_info['llvm_ir'],
+                    comp_info['ir_generation_stderr']
                 ))
-            
+
         return True
     except json.JSONDecodeError as e:
         print(f"JSON decode error for {package_name}: {e}")
@@ -72,10 +75,10 @@ def process_package(package_dir, sub_dir):
         return False
 
 def traverse_dir(root):
-    
+
     packages = []
     dirs = [d for d in os.scandir(root) if d.is_dir()]
-    
+
     for dir in dirs:
         for sub_dir in os.scandir(dir.path):
             if sub_dir.is_dir():
@@ -136,7 +139,9 @@ def main():
         output_file TEXT,
         functions TEXT,
         random_function TEXT,
+        IR_generation_return_code INTEGER,
         LLVM_IR TEXT,
+        IR_generation_stderr TEXT,
         PRIMARY KEY (package_name, file_path),
         FOREIGN KEY (package_name) REFERENCES packages (name)
     )

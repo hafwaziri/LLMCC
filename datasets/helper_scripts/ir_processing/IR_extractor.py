@@ -37,26 +37,26 @@ def generate_ir_output_command(original_compilation_command):
         if part == "-c":
             continue
         
-        if part.startswith('-D') and '=' in part:
-            macro_part, value_part = part.split('=', 1)
-            if value_part.startswith('"') and value_part.endswith('"'):
-                value_part = value_part[1:-1]
-            if '/' in value_part:
-                part = f'{macro_part}=\\"{value_part}\\"'
-            else:
-                part = f'{macro_part}={value_part}'
+        # if part.startswith('-D') and '=' in part:
+        #     macro_part, value_part = part.split('=', 1)
+        #     if value_part.startswith('"') and value_part.endswith('"'):
+        #         value_part = value_part[1:-1]
+        #     if '/' in value_part:
+        #         part = f'{macro_part}=\\"{value_part}\\"'
+        #     else:
+        #         part = f'{macro_part}={value_part}'
         
         filtered_parts.append(part)
     
     filtered_parts.extend(["-S", "-emit-llvm", "-o", "-"])
     
-    return " ".join(filtered_parts)
+    return filtered_parts
 
 def generate_ir_for_source_file(source_path, compilation_command):
     try:
         LLVM_IR = subprocess.run(compilation_command,
                                  cwd=source_path,
-                                 shell=True,
+                                 shell=False,
                                  capture_output=True,
                                  text=True
                                  )
@@ -69,7 +69,7 @@ def generate_ir_for_function(source_ir, function_name):
     try:
         extract_command = f"llvm-extract -func={function_name} -S - -o -"
         LLVM_IR = subprocess.run(extract_command,
-                                 shell=True,
+                                 shell=False,
                                  input=source_ir,
                                  capture_output=True,
                                  text=True)

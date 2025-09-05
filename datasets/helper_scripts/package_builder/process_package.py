@@ -183,7 +183,9 @@ def process_package(package, package_subdir):
                     if not os.path.exists(source_file["source_file"]) or not os.path.exists(source_file["directory"]):
                         source_file["functions"] = None
                         source_file["random_function"] = None
+                        source_file["ir_generation_return_code"] = 3
                         source_file["llvm_ir"] = None
+                        source_file["ir_generation_stderr"] = None
                         continue
 
                     functions = extract_function_from_source(source_file["source_file"])
@@ -192,7 +194,9 @@ def process_package(package, package_subdir):
                     source_file["random_function"] = random_function
                     compilation_command = generate_ir_output_command(source_file["compiler_flags"])
                     source_ir = generate_ir_for_source_file(source_file["directory"], compilation_command)
+                    source_file["ir_generation_return_code"] = source_ir.returncode
                     source_file["llvm_ir"] = source_ir.stdout
+                    source_file["ir_generation_stderr"] = source_ir.stderr
 
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -232,16 +236,20 @@ def process_package(package, package_subdir):
                     if not os.path.exists(source_file["source_file"]) or not os.path.exists(source_file["directory"]):
                         source_file["functions"] = None
                         source_file["random_function"] = None
+                        source_file["ir_generation_return_code"] = 3
                         source_file["llvm_ir"] = None
+                        source_file["ir_generation_stderr"] = None
                         continue
-                    
+
                     functions = extract_function_from_source(source_file["source_file"])
                     random_function = random_function_selector(functions)
                     source_file["functions"] = functions
                     source_file["random_function"] = random_function
                     compilation_command = generate_ir_output_command(source_file["compiler_flags"])
                     source_ir = generate_ir_for_source_file(source_file["directory"], compilation_command)
+                    source_file["ir_generation_return_code"] = source_ir.returncode
                     source_file["llvm_ir"] = source_ir.stdout
+                    source_file["ir_generation_stderr"] = source_ir.stderr
 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
