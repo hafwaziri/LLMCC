@@ -67,7 +67,7 @@ def generate_ir_for_source_file(source_path, compilation_command):
 
 def generate_ir_for_function(source_ir, function_name):
     try:
-        extract_command = f"llvm-extract -func={function_name} -S - -o -"
+        extract_command = ["llvm-extract", f"-func={function_name}", "-S", "-", "-o", "-"]
         LLVM_IR = subprocess.run(extract_command,
                                  shell=False,
                                  input=source_ir,
