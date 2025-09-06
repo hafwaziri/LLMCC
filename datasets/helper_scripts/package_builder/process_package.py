@@ -170,17 +170,21 @@ def process_package(package, package_subdir):
 
                 if dh_auto_test != "":
                     (test_stdout, test_stderr, test_returncode, test_detected,
-                     testing_framework, stdout_diff, stderr_diff,
-                     package_viable_for_test_dataset) = test_package(package.name,
-                                                                     dh_auto_test,
-                                                                     build_system,
-                                                                     package_subdir)
+                    testing_framework, stdout_diff, stderr_diff,
+                    package_viable_for_test_dataset) = test_package(package.name,
+                                                                    dh_auto_test,
+                                                                    build_system,
+                                                                    package_subdir)
                 # Extract the Compilation Commands for the C and C++ Files
 
                 compilation_data = extract_compilation_commands(package_subdir.path)
 
                 for source_file in compilation_data:
-                    if not os.path.exists(source_file["source_file"]) or not os.path.exists(source_file["directory"]):
+                    if (not os.path.exists(source_file["source_file"])
+                        or not os.path.exists(source_file["directory"])
+                        or source_file["source_file"].split('/')[-1] in
+                        ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
+                        "CMakeCXXCompilerABI.cpp"]):
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
@@ -204,11 +208,11 @@ def process_package(package, package_subdir):
             update_apt_sources()
 
             try:
-                subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"], 
-                             cwd=package_subdir.path, 
-                             shell=False, 
-                             timeout=BUILDDEP_TIMEOUT,
-                             capture_output=True)
+                subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"],
+                            cwd=package_subdir.path,
+                            shell=False,
+                            timeout=BUILDDEP_TIMEOUT,
+                            capture_output=True)
             except Exception as e:
                 print(f"Build-dep failed: {e}", file=sys.stderr)
 
@@ -222,18 +226,22 @@ def process_package(package, package_subdir):
 
                 if dh_auto_test != "":
                     (test_stdout, test_stderr, test_returncode, test_detected,
-                     testing_framework, stdout_diff, stderr_diff,
-                     package_viable_for_test_dataset) = test_package(package.name,
-                                                                     dh_auto_test,
-                                                                     build_system,
-                                                                     package_subdir)
+                    testing_framework, stdout_diff, stderr_diff,
+                    package_viable_for_test_dataset) = test_package(package.name,
+                                                                    dh_auto_test,
+                                                                    build_system,
+                                                                    package_subdir)
 
                 # Extract the Compilation Commands for the C and C++ Files
 
                 compilation_data = extract_compilation_commands(package_subdir.path)
 
                 for source_file in compilation_data:
-                    if not os.path.exists(source_file["source_file"]) or not os.path.exists(source_file["directory"]):
+                    if (not os.path.exists(source_file["source_file"])
+                        or not os.path.exists(source_file["directory"])
+                        or source_file["source_file"].split('/')[-1] in
+                        ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
+                        "CMakeCXXCompilerABI.cpp"]):
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
