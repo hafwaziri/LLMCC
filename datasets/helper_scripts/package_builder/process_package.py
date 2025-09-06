@@ -154,8 +154,8 @@ def process_package(package, package_subdir):
 
             try:
                 subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"], 
-                             cwd=package_subdir.path, 
-                             shell=False, 
+                             cwd=package_subdir.path,
+                             shell=False,
                              timeout=BUILDDEP_TIMEOUT,
                              capture_output=True)
             except Exception as e:
@@ -165,8 +165,6 @@ def process_package(package, package_subdir):
 
             if build_returncode == 0:
                 dh_auto_test = run_dh_command("dh_auto_test", package_subdir)
-
-                #TODO: Check if dh_auto_test is empty. Call the function for package testing
 
                 if dh_auto_test != "":
                     (test_stdout, test_stderr, test_returncode, test_detected,
@@ -184,7 +182,13 @@ def process_package(package, package_subdir):
                         or not os.path.exists(source_file["directory"])
                         or source_file["source_file"].split('/')[-1] in
                         ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
-                        "CMakeCXXCompilerABI.cpp"]):
+                        "CMakeCXXCompilerABI.cpp"]
+                        or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
+                                                                    "testing", "unittest", "ctest",
+                                                                    "check", "test-suite",
+                                                                    "testsuite", "regression"]
+                        or "test" in source_file["source_file"].lower()
+                        or "testing" in source_file["source_file"].lower()):
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
@@ -222,8 +226,6 @@ def process_package(package, package_subdir):
                 dh_auto_build = run_dh_command("dh_auto_build", package_subdir)
                 dh_auto_test = run_dh_command("dh_auto_test", package_subdir)
 
-                #TODO: Check if dh_auto_test is empty. Call the function for package testing
-
                 if dh_auto_test != "":
                     (test_stdout, test_stderr, test_returncode, test_detected,
                     testing_framework, stdout_diff, stderr_diff,
@@ -241,7 +243,13 @@ def process_package(package, package_subdir):
                         or not os.path.exists(source_file["directory"])
                         or source_file["source_file"].split('/')[-1] in
                         ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
-                        "CMakeCXXCompilerABI.cpp"]):
+                        "CMakeCXXCompilerABI.cpp"]
+                        or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
+                                                                    "testing", "unittest", "ctest",
+                                                                    "check", "test-suite",
+                                                                    "testsuite", "regression"]
+                        or "test" in source_file["source_file"].lower()
+                        or "testing" in source_file["source_file"].lower()):
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
