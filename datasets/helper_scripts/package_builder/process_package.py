@@ -187,8 +187,8 @@ def process_package(package, package_subdir):
                                                                     "testing", "unittest", "ctest",
                                                                     "check", "test-suite",
                                                                     "testsuite", "regression"]
-                        or "test" in source_file["source_file"].lower()
-                        or "testing" in source_file["source_file"].lower()):
+                        or "test" in source_file["source_file"].split('/')[-1].lower()
+                        or "testing" in source_file["source_file"].split('/')[-1].lower()):
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
@@ -248,8 +248,8 @@ def process_package(package, package_subdir):
                                                                     "testing", "unittest", "ctest",
                                                                     "check", "test-suite",
                                                                     "testsuite", "regression"]
-                        or "test" in source_file["source_file"].lower()
-                        or "testing" in source_file["source_file"].lower()):
+                        or "test" in source_file["source_file"].split('/')[-1].lower()
+                        or "testing" in source_file["source_file"].split('/')[-1].lower()):
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
