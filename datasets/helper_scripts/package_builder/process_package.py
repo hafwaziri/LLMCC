@@ -153,11 +153,12 @@ def process_package(package, package_subdir):
             update_apt_sources()
 
             try:
-                subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"], 
+                subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"],
                              cwd=package_subdir.path,
                              shell=False,
                              timeout=BUILDDEP_TIMEOUT,
-                             capture_output=True)
+                             capture_output=True,
+                             check=False)
             except Exception as e:
                 print(f"Build-dep failed: {e}", file=sys.stderr)
 
@@ -184,6 +185,9 @@ def process_package(package, package_subdir):
                         source_file["ir_generation_return_code"] = 3
                         source_file["llvm_ir"] = None
                         source_file["ir_generation_stderr"] = None
+                        source_file["random_func_ir_generation_return_code"] = 3
+                        source_file["random_func_llvm_ir"] = None
+                        source_file["random_func_ir_generation_stderr"] = None
 
                         if (not os.path.exists(source_file["source_file"])
                             or not os.path.exists(source_file["directory"])
@@ -191,9 +195,10 @@ def process_package(package, package_subdir):
                             ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
                             "CMakeCXXCompilerABI.cpp"]
                             or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
-                                                                        "testing", "unittest", "ctest",
-                                                                        "check", "test-suite",
-                                                                        "testsuite", "regression"]
+                                                                        "testing", "unittest",
+                                                                        "ctest", "check",
+                                                                        "test-suite", "testsuite",
+                                                                        "regression"]
                             or "test" in source_file["source_file"].split('/')[-1].lower()
                             or "testing" in source_file["source_file"].split('/')[-1].lower()):
                             continue
@@ -218,6 +223,14 @@ def process_package(package, package_subdir):
                             source_file["llvm_ir"] = source_ir.stdout
                             source_file["ir_generation_stderr"] = source_ir.stderr
 
+                            if source_ir.returncode == 0 and source_ir.stdout and random_function:
+                                function_ir = generate_ir_for_function(source_ir.stdout,
+                                                                    random_function['name'])
+                                source_file["random_func_ir_generation_return_code"] = (
+                                    function_ir.returncode)
+                                source_file["random_func_llvm_ir"] = function_ir.stdout
+                                source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+
         else:
             build_system = detect_build_system(dh_auto_config)
 
@@ -228,7 +241,8 @@ def process_package(package, package_subdir):
                             cwd=package_subdir.path,
                             shell=False,
                             timeout=BUILDDEP_TIMEOUT,
-                            capture_output=True)
+                            capture_output=True,
+                            check=False)
             except Exception as e:
                 print(f"Build-dep failed: {e}", file=sys.stderr)
 
@@ -255,6 +269,9 @@ def process_package(package, package_subdir):
                         source_file["ir_generation_return_code"] = 3
                         source_file["llvm_ir"] = None
                         source_file["ir_generation_stderr"] = None
+                        source_file["random_func_ir_generation_return_code"] = 3
+                        source_file["random_func_llvm_ir"] = None
+                        source_file["random_func_ir_generation_stderr"] = None
 
                         if (not os.path.exists(source_file["source_file"])
                             or not os.path.exists(source_file["directory"])
@@ -262,9 +279,10 @@ def process_package(package, package_subdir):
                             ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
                             "CMakeCXXCompilerABI.cpp"]
                             or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
-                                                                        "testing", "unittest", "ctest",
-                                                                        "check", "test-suite",
-                                                                        "testsuite", "regression"]
+                                                                        "testing", "unittest",
+                                                                        "ctest", "check",
+                                                                        "test-suite", "testsuite",
+                                                                        "regression"]
                             or "test" in source_file["source_file"].split('/')[-1].lower()
                             or "testing" in source_file["source_file"].split('/')[-1].lower()):
                             continue
@@ -289,12 +307,21 @@ def process_package(package, package_subdir):
                             source_file["llvm_ir"] = source_ir.stdout
                             source_file["ir_generation_stderr"] = source_ir.stderr
 
+                            if source_ir.returncode == 0 and source_ir.stdout and random_function:
+                                function_ir = generate_ir_for_function(source_ir.stdout,
+                                                                    random_function['name'])
+                                source_file["random_func_ir_generation_return_code"] = (
+                                    function_ir.returncode)
+                                source_file["random_func_llvm_ir"] = function_ir.stdout
+                                source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         build_stderr = f"PROCESS_ERROR: {str(e)}"
         build_returncode = 1
 
-    return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode,
-            test_stdout, test_stderr, test_returncode, test_detected, testing_framework, stdout_diff,
-            stderr_diff, package_viable_for_test_dataset, compilation_data)
+    return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr,
+            build_returncode, test_stdout, test_stderr, test_returncode, test_detected,
+            testing_framework, stdout_diff, stderr_diff, package_viable_for_test_dataset,
+            compilation_data)

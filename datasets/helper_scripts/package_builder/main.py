@@ -51,8 +51,9 @@ def process_package(package_dir, sub_dir):
                 cursor_local.execute("""
                     INSERT OR REPLACE INTO source_files (
                         file_path, package_name, compilation_command, output_file, functions, random_function, 
-                        IR_generation_return_code, LLVM_IR, IR_generation_stderr
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        IR_generation_return_code, LLVM_IR, IR_generation_stderr, random_function_IR_generation_return_code,
+                        random_function_IR, random_function_IR_stderr)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
@@ -62,7 +63,10 @@ def process_package(package_dir, sub_dir):
                     json.dumps(comp_info['random_function']),
                     comp_info['ir_generation_return_code'],
                     comp_info['llvm_ir'],
-                    comp_info['ir_generation_stderr']
+                    comp_info['ir_generation_stderr'],
+                    comp_info['random_function_ir_generation_return_code'],
+                    comp_info['random_function_llvm_ir'],
+                    comp_info['random_function_ir_generation_stderr']
                 ))
 
         return True
@@ -102,15 +106,15 @@ def traverse_dir(root):
         
 
 def main():
-    
+
     if len(sys.argv) < 2:
         print("Usage: python script.py <root_directory>")
         sys.exit(1)
     root_dir = sys.argv[1]
-    
+
     conn = sqlite3.connect('../../debian_source_test.db')
     cursor = conn.cursor()
-    
+
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS packages (
         name TEXT PRIMARY KEY NOT NULL,
@@ -130,7 +134,7 @@ def main():
         package_viable_for_test_dataset INTEGER
     )
     ''')
-    
+
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS source_files (
         file_path TEXT,
@@ -142,6 +146,9 @@ def main():
         IR_generation_return_code INTEGER,
         LLVM_IR TEXT,
         IR_generation_stderr TEXT,
+        random_function_IR_generation_return_code INTEGER,
+        random_function_IR TEXT,
+        random_function_IR_stderr TEXT,
         PRIMARY KEY (package_name, file_path),
         FOREIGN KEY (package_name) REFERENCES packages (name)
     )
@@ -149,8 +156,8 @@ def main():
 
     conn.commit()
     conn.close()
-    
+
     traverse_dir(root_dir)
-    
+
 if __name__ == "__main__":
     main()
