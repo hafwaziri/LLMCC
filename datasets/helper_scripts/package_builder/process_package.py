@@ -6,7 +6,7 @@ import json
 from debian_package_tester import test_package
 from function_extractor import extract_function_from_source
 from random_function_selector import random_function_selector
-from IR_extractor import generate_ir_for_source_file
+from IR_extractor import generate_ir_for_source_file, generate_ir_for_function
 from IR_extractor import generate_ir_output_command
 
 
@@ -177,34 +177,46 @@ def process_package(package, package_subdir):
 
                 compilation_data = extract_compilation_commands(package_subdir.path)
 
-                for source_file in compilation_data:
-                    if (not os.path.exists(source_file["source_file"])
-                        or not os.path.exists(source_file["directory"])
-                        or source_file["source_file"].split('/')[-1] in
-                        ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
-                        "CMakeCXXCompilerABI.cpp"]
-                        or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
-                                                                    "testing", "unittest", "ctest",
-                                                                    "check", "test-suite",
-                                                                    "testsuite", "regression"]
-                        or "test" in source_file["source_file"].split('/')[-1].lower()
-                        or "testing" in source_file["source_file"].split('/')[-1].lower()):
+                if compilation_data:
+                    for source_file in compilation_data:
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
                         source_file["llvm_ir"] = None
                         source_file["ir_generation_stderr"] = None
-                        continue
 
-                    functions = extract_function_from_source(source_file["source_file"])
-                    random_function = random_function_selector(functions)
-                    source_file["functions"] = functions
-                    source_file["random_function"] = random_function
-                    compilation_command = generate_ir_output_command(source_file["compiler_flags"])
-                    source_ir = generate_ir_for_source_file(source_file["directory"], compilation_command)
-                    source_file["ir_generation_return_code"] = source_ir.returncode
-                    source_file["llvm_ir"] = source_ir.stdout
-                    source_file["ir_generation_stderr"] = source_ir.stderr
+                        if (not os.path.exists(source_file["source_file"])
+                            or not os.path.exists(source_file["directory"])
+                            or source_file["source_file"].split('/')[-1] in
+                            ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
+                            "CMakeCXXCompilerABI.cpp"]
+                            or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
+                                                                        "testing", "unittest", "ctest",
+                                                                        "check", "test-suite",
+                                                                        "testsuite", "regression"]
+                            or "test" in source_file["source_file"].split('/')[-1].lower()
+                            or "testing" in source_file["source_file"].split('/')[-1].lower()):
+                            continue
+
+                        functions = extract_function_from_source(source_file["source_file"])
+                        if functions:
+                            source_file["functions"] = functions
+
+                            random_function = random_function_selector(functions)
+                            if random_function:
+                                source_file["random_function"] = random_function
+
+                        if source_file["compiler_flags"]:
+                            compilation_command = generate_ir_output_command(
+                                source_file["compiler_flags"])
+                            if not compilation_command:
+                                continue
+
+                            source_ir = generate_ir_for_source_file(source_file["directory"],
+                                                                compilation_command)
+                            source_file["ir_generation_return_code"] = source_ir.returncode
+                            source_file["llvm_ir"] = source_ir.stdout
+                            source_file["ir_generation_stderr"] = source_ir.stderr
 
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -234,38 +246,48 @@ def process_package(package, package_subdir):
                                                                     build_system,
                                                                     package_subdir)
 
-                # Extract the Compilation Commands for the C and C++ Files
-
                 compilation_data = extract_compilation_commands(package_subdir.path)
 
-                for source_file in compilation_data:
-                    if (not os.path.exists(source_file["source_file"])
-                        or not os.path.exists(source_file["directory"])
-                        or source_file["source_file"].split('/')[-1] in
-                        ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
-                        "CMakeCXXCompilerABI.cpp"]
-                        or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
-                                                                    "testing", "unittest", "ctest",
-                                                                    "check", "test-suite",
-                                                                    "testsuite", "regression"]
-                        or "test" in source_file["source_file"].split('/')[-1].lower()
-                        or "testing" in source_file["source_file"].split('/')[-1].lower()):
+                if compilation_data:
+                    for source_file in compilation_data:
                         source_file["functions"] = None
                         source_file["random_function"] = None
                         source_file["ir_generation_return_code"] = 3
                         source_file["llvm_ir"] = None
                         source_file["ir_generation_stderr"] = None
-                        continue
 
-                    functions = extract_function_from_source(source_file["source_file"])
-                    random_function = random_function_selector(functions)
-                    source_file["functions"] = functions
-                    source_file["random_function"] = random_function
-                    compilation_command = generate_ir_output_command(source_file["compiler_flags"])
-                    source_ir = generate_ir_for_source_file(source_file["directory"], compilation_command)
-                    source_file["ir_generation_return_code"] = source_ir.returncode
-                    source_file["llvm_ir"] = source_ir.stdout
-                    source_file["ir_generation_stderr"] = source_ir.stderr
+                        if (not os.path.exists(source_file["source_file"])
+                            or not os.path.exists(source_file["directory"])
+                            or source_file["source_file"].split('/')[-1] in
+                            ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
+                            "CMakeCXXCompilerABI.cpp"]
+                            or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
+                                                                        "testing", "unittest", "ctest",
+                                                                        "check", "test-suite",
+                                                                        "testsuite", "regression"]
+                            or "test" in source_file["source_file"].split('/')[-1].lower()
+                            or "testing" in source_file["source_file"].split('/')[-1].lower()):
+                            continue
+
+                        functions = extract_function_from_source(source_file["source_file"])
+                        if functions:
+                            source_file["functions"] = functions
+
+                            random_function = random_function_selector(functions)
+                            if random_function:
+                                source_file["random_function"] = random_function
+
+                        if source_file["compiler_flags"]:
+                            compilation_command = generate_ir_output_command(
+                                source_file["compiler_flags"])
+                            if not compilation_command:
+                                continue
+
+                            source_ir = generate_ir_for_source_file(source_file["directory"],
+                                                                compilation_command)
+                            source_file["ir_generation_return_code"] = source_ir.returncode
+                            source_file["llvm_ir"] = source_ir.stdout
+                            source_file["ir_generation_stderr"] = source_ir.stderr
 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
