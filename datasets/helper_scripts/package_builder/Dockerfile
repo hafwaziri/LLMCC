@@ -20,6 +20,8 @@ RUN apt-get update && apt-get install -y \
     bear \
     python3 \
     nano \
+    llvm \
+    llvm-dev \
     #Packages for the testing framework
     golang-go \
     python3-pytest \
