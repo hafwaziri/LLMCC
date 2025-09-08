@@ -24,10 +24,13 @@ def run_dh_command(command, package, no_act=True):
                                     capture_output=True,
                                     text=True,
                                     shell=False,
-                                    timeout=COMMAND_TIMEOUT)
+                                    timeout=COMMAND_TIMEOUT,
+                                    check=False)
             return result.stdout
         else:
-            subprocess.run([command], cwd=package.path, timeout=COMMAND_TIMEOUT)
+            subprocess.run([command], cwd=package.path, timeout=COMMAND_TIMEOUT,
+                        shell=False,
+                        check=False)
             return ""
     except subprocess.TimeoutExpired:
         return "TIMEOUT"
@@ -42,7 +45,8 @@ def build_package(package):
                                 capture_output=True,
                                 text=True,
                                 shell=False,
-                                timeout=BUILD_TIMEOUT
+                                timeout=BUILD_TIMEOUT,
+                                check=False
                                 )
 
         return result.stderr, result.returncode
@@ -64,7 +68,8 @@ def detect_build_system(output_txt):
         return "makemaker"
     elif "qmake" in output_lower:
         return "qmake"
-    elif "make" in output_lower and not any(x in output_lower for x in ["cmake", "makefile.pl", "qmake"]):
+    elif "make" in output_lower and not any(x in output_lower for x in
+                                            ["cmake", "makefile.pl", "qmake"]):
         return "make"
     return "unknown"
 
@@ -87,11 +92,11 @@ deb-src https://deb.debian.org/debian bookworm-updates main non-free-firmware"""
         with open('/tmp/custom_sources.list', 'w') as f:
             f.write(sources_content)
 
-        subprocess.run(["sudo", "cp", "/tmp/custom_sources.list", "/etc/apt/sources.list"], 
+        subprocess.run(["sudo", "cp", "/tmp/custom_sources.list", "/etc/apt/sources.list"],
                      check=True,
                      timeout=COMMAND_TIMEOUT)
 
-        subprocess.run(["sudo", "apt-get", "update"], 
+        subprocess.run(["sudo", "apt-get", "update"],
                      check=True,
                      timeout=COMMAND_TIMEOUT,
                      capture_output=True)
@@ -174,7 +179,6 @@ def process_package(package, package_subdir):
                                                                     dh_auto_test,
                                                                     build_system,
                                                                     package_subdir)
-                # Extract the Compilation Commands for the C and C++ Files
 
                 compilation_data = extract_compilation_commands(package_subdir.path)
 
@@ -219,17 +223,19 @@ def process_package(package, package_subdir):
 
                             source_ir = generate_ir_for_source_file(source_file["directory"],
                                                                 compilation_command)
-                            source_file["ir_generation_return_code"] = source_ir.returncode
-                            source_file["llvm_ir"] = source_ir.stdout
-                            source_file["ir_generation_stderr"] = source_ir.stderr
+                            if source_ir:
+                                source_file["ir_generation_return_code"] = source_ir.returncode
+                                source_file["llvm_ir"] = source_ir.stdout
+                                source_file["ir_generation_stderr"] = source_ir.stderr
 
-                            if source_ir.returncode == 0 and source_ir.stdout and random_function:
-                                function_ir = generate_ir_for_function(source_ir.stdout,
-                                                                    random_function['name'])
-                                source_file["random_func_ir_generation_return_code"] = (
-                                    function_ir.returncode)
-                                source_file["random_func_llvm_ir"] = function_ir.stdout
-                                source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+                                if source_ir.returncode == 0 and source_ir.stdout and source_file["random_function"]:
+                                    function_ir = generate_ir_for_function(source_ir.stdout,
+                                                                        random_function['name'])
+                                    if function_ir:
+                                        source_file["random_func_ir_generation_return_code"] = (
+                                            function_ir.returncode)
+                                        source_file["random_func_llvm_ir"] = function_ir.stdout
+                                        source_file["random_func_ir_generation_stderr"] = function_ir.stderr
 
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -303,17 +309,19 @@ def process_package(package, package_subdir):
 
                             source_ir = generate_ir_for_source_file(source_file["directory"],
                                                                 compilation_command)
-                            source_file["ir_generation_return_code"] = source_ir.returncode
-                            source_file["llvm_ir"] = source_ir.stdout
-                            source_file["ir_generation_stderr"] = source_ir.stderr
+                            if source_ir:
+                                source_file["ir_generation_return_code"] = source_ir.returncode
+                                source_file["llvm_ir"] = source_ir.stdout
+                                source_file["ir_generation_stderr"] = source_ir.stderr
 
-                            if source_ir.returncode == 0 and source_ir.stdout and random_function:
-                                function_ir = generate_ir_for_function(source_ir.stdout,
-                                                                    random_function['name'])
-                                source_file["random_func_ir_generation_return_code"] = (
-                                    function_ir.returncode)
-                                source_file["random_func_llvm_ir"] = function_ir.stdout
-                                source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+                                if source_ir.returncode == 0 and source_ir.stdout and source_file["random_function"]:
+                                    function_ir = generate_ir_for_function(source_ir.stdout,
+                                                                        random_function['name'])
+                                    if function_ir:
+                                        source_file["random_func_ir_generation_return_code"] = (
+                                            function_ir.returncode)
+                                        source_file["random_func_llvm_ir"] = function_ir.stdout
+                                        source_file["random_func_ir_generation_stderr"] = function_ir.stderr
 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
