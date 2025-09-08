@@ -3,18 +3,19 @@ import subprocess
 import json
 import os
 import sqlite3
-from tqdm import tqdm
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
+import debugpy
 
 def process_package(package_dir, sub_dir):
 
     package_path = os.path.abspath(package_dir.path)
     sub_dir_path = os.path.abspath(sub_dir.path)
-    
+
     package_name = os.path.basename(package_path)
     sub_dir_name = os.path.basename(sub_dir_path)
-    
+
     docker_cmd = [
         "docker", "run", "--rm",
         "-v", f"{package_path}:/worker/{package_name}",
@@ -25,15 +26,16 @@ def process_package(package_dir, sub_dir):
         "debian-builder",
         "python3", "build_worker.py", f"/worker/{package_name}", f"/worker/{sub_dir_name}"
     ]
-    
+
     print(f"Processing Package: {package_name}")
     result = subprocess.run(docker_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    
+
     try:
-        (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode, 
-         test_stdout, test_stderr, test_returncode, test_detected, testing_framework, 
-         test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset, compilation_data) = json.loads(result.stdout)
-        
+        (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode,
+        test_stdout, test_stderr, test_returncode, test_detected, testing_framework,
+        test_stdout_diff, test_stderr_diff,
+        package_viable_for_test_dataset, compilation_data) = json.loads(result.stdout)
+
         with sqlite3.connect('../../debian_source_test.db') as conn_local:
             cursor_local = conn_local.cursor()
             cursor_local.execute("""
@@ -42,9 +44,10 @@ def process_package(package_dir, sub_dir):
                     build_stderr, build_return_code, test_stdout, test_stderr, test_returncode,
                     test_detected, testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test, 
-                  build_stderr, build_returncode, test_stdout, test_stderr, test_returncode, test_detected, 
-                  testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset))
+            """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test,
+                build_stderr, build_returncode, test_stdout, test_stderr, test_returncode,
+                test_detected, testing_framework, test_stdout_diff, test_stderr_diff,
+                package_viable_for_test_dataset))
             conn_local.commit()
 
             for comp_info in compilation_data:
@@ -52,27 +55,27 @@ def process_package(package_dir, sub_dir):
                     INSERT OR REPLACE INTO source_files (
                         file_path, package_name, compilation_command, output_file, functions, random_function, 
                         IR_generation_return_code, LLVM_IR, IR_generation_stderr, random_function_IR_generation_return_code,
-                        random_function_IR, random_function_IR_stderr)
+                        random_function_IR, random_function_IR_stderr
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
                     ' '.join(comp_info['compiler_flags']),
                     comp_info['output_file'],
-                    json.dumps(comp_info['functions']),
-                    json.dumps(comp_info['random_function']),
+                    json.dumps(comp_info['functions']) if comp_info['functions'] is not None else None,
+                    json.dumps(comp_info['random_function']) if comp_info['random_function'] is not None else None,
                     comp_info['ir_generation_return_code'],
                     comp_info['llvm_ir'],
                     comp_info['ir_generation_stderr'],
-                    comp_info['random_function_ir_generation_return_code'],
-                    comp_info['random_function_llvm_ir'],
-                    comp_info['random_function_ir_generation_stderr']
+                    comp_info['random_func_ir_generation_return_code'],
+                    comp_info['random_func_llvm_ir'],
+                    comp_info['random_func_ir_generation_stderr']
                 ))
-
+            conn_local.commit()
         return True
     except json.JSONDecodeError as e:
         print(f"JSON decode error for {package_name}: {e}")
-        print(f"Raw output: {result.stdout!r}")
+        # print(f"Raw output: {result.stdout!r}")
         return False
     except Exception as e:
         print(f"Exception in package: {package_name}: {e}")
@@ -88,8 +91,8 @@ def traverse_dir(root):
             if sub_dir.is_dir():
                 packages.append((dir, sub_dir))
                 break
-    
-    
+
+
     with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
         futures = []
         for dir, sub_dir in packages:
@@ -103,7 +106,7 @@ def traverse_dir(root):
             desc="Processing packages"
         ):
             results.append(future.result())
-        
+
 
 def main():
 
@@ -160,4 +163,6 @@ def main():
     traverse_dir(root_dir)
 
 if __name__ == "__main__":
+    # debugpy.listen(("0.0.0.0", 5679))
+    # debugpy.wait_for_client()
     main()
