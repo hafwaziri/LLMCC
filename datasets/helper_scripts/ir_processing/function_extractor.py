@@ -12,6 +12,7 @@ Functions:
 
 from clang.cindex import CursorKind, Index, TypeKind
 import llvmlite.binding as llvm
+import cxxfilt
 
 #TODO: See if parsing LLVM IR for function name extraction is better
 
@@ -94,13 +95,38 @@ def extract_function_from_ir(ir_code):
         print(f"IR Function Extractor error: {e}")
         return []
 
+def demangle_symbols(functions):
+    try:
+        demangled_functions = []
+        for func in functions:
+            demangled_name = cxxfilt.demangle(func['name'])
+            demangled_func = func.copy()
+            demangled_func['name'] = demangled_name
+            demangled_functions.append(demangled_func)
+        return demangled_functions
+    except Exception as e:
+        print(f"Demangling error: {e}")
+        return functions
+
 if __name__ == "__main__":
 
-    source_file = "test.cpp" 
+    source_ir = r'''
 
-    functions = extract_function_from_source(source_file)
+'''
+
+    functions = extract_function_from_ir(source_ir)
 
     for func in functions:
+        print(f"Function: {func['name']}")
+        print(f"  Return type: {func['return_type']}")
+        print(f"  Arguments: {func['arguments']}")
+        print()
+
+    print('#'*50)
+    print("\nAfter Demangling:\n")
+
+    demangled = demangle_symbols(functions)
+    for func in demangled:
         print(f"Function: {func['name']}")
         print(f"  Return type: {func['return_type']}")
         print(f"  Arguments: {func['arguments']}")
