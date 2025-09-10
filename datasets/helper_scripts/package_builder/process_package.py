@@ -130,6 +130,62 @@ def extract_compilation_commands(package_subdir):
 
     return compilation_data
 
+def ir_processing_for_package(compilation_data):
+    for source_file in compilation_data:
+        source_file["functions"] = None
+        source_file["random_function"] = None
+        source_file["ir_generation_return_code"] = 3
+        source_file["llvm_ir"] = None
+        source_file["ir_generation_stderr"] = None
+        source_file["random_func_ir_generation_return_code"] = 3
+        source_file["random_func_llvm_ir"] = None
+        source_file["random_func_ir_generation_stderr"] = None
+
+        if (not os.path.exists(source_file["source_file"])
+            or not os.path.exists(source_file["directory"])
+            or source_file["source_file"].split('/')[-1] in
+            ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
+            "CMakeCXXCompilerABI.cpp"]
+            or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
+                                                        "testing", "unittest",
+                                                        "ctest", "check",
+                                                        "test-suite", "testsuite",
+                                                        "regression"]
+            or "test" in source_file["source_file"].split('/')[-1].lower()
+            or "testing" in source_file["source_file"].split('/')[-1].lower()):
+            continue
+
+        functions = extract_function_from_source(source_file["source_file"])
+        if functions:
+            source_file["functions"] = functions
+
+            random_function = random_function_selector(functions)
+            if random_function:
+                source_file["random_function"] = random_function
+
+        if source_file["compiler_flags"]:
+            compilation_command = generate_ir_output_command(
+                source_file["compiler_flags"])
+            if not compilation_command:
+                continue
+
+            source_ir = generate_ir_for_source_file(source_file["directory"],
+                                                compilation_command)
+            if source_ir:
+                source_file["ir_generation_return_code"] = source_ir.returncode
+                source_file["llvm_ir"] = source_ir.stdout
+                source_file["ir_generation_stderr"] = source_ir.stderr
+
+                if (source_ir.returncode == 0
+                    and source_ir.stdout and source_file["random_function"]):
+                    function_ir = generate_ir_for_function(source_ir.stdout,
+                                                        random_function['name'])
+                    if function_ir:
+                        source_file["random_func_ir_generation_return_code"] = (
+                            function_ir.returncode)
+                        source_file["random_func_llvm_ir"] = function_ir.stdout
+                        source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+    return compilation_data
 
 def process_package(package, package_subdir):
     build_system = "unknown"
@@ -147,7 +203,6 @@ def process_package(package, package_subdir):
     package_viable_for_test_dataset = 0
     compilation_data = []
 
-
     try:
         dh_auto_config = run_dh_command("dh_auto_configure", package_subdir)
 
@@ -159,11 +214,11 @@ def process_package(package, package_subdir):
 
             try:
                 subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"],
-                             cwd=package_subdir.path,
-                             shell=False,
-                             timeout=BUILDDEP_TIMEOUT,
-                             capture_output=True,
-                             check=False)
+                            cwd=package_subdir.path,
+                            shell=False,
+                            timeout=BUILDDEP_TIMEOUT,
+                            capture_output=True,
+                            check=False)
             except Exception as e:
                 print(f"Build-dep failed: {e}", file=sys.stderr)
 
@@ -183,59 +238,7 @@ def process_package(package, package_subdir):
                 compilation_data = extract_compilation_commands(package_subdir.path)
 
                 if compilation_data:
-                    for source_file in compilation_data:
-                        source_file["functions"] = None
-                        source_file["random_function"] = None
-                        source_file["ir_generation_return_code"] = 3
-                        source_file["llvm_ir"] = None
-                        source_file["ir_generation_stderr"] = None
-                        source_file["random_func_ir_generation_return_code"] = 3
-                        source_file["random_func_llvm_ir"] = None
-                        source_file["random_func_ir_generation_stderr"] = None
-
-                        if (not os.path.exists(source_file["source_file"])
-                            or not os.path.exists(source_file["directory"])
-                            or source_file["source_file"].split('/')[-1] in
-                            ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
-                            "CMakeCXXCompilerABI.cpp"]
-                            or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
-                                                                        "testing", "unittest",
-                                                                        "ctest", "check",
-                                                                        "test-suite", "testsuite",
-                                                                        "regression"]
-                            or "test" in source_file["source_file"].split('/')[-1].lower()
-                            or "testing" in source_file["source_file"].split('/')[-1].lower()):
-                            continue
-
-                        functions = extract_function_from_source(source_file["source_file"])
-                        if functions:
-                            source_file["functions"] = functions
-
-                            random_function = random_function_selector(functions)
-                            if random_function:
-                                source_file["random_function"] = random_function
-
-                        if source_file["compiler_flags"]:
-                            compilation_command = generate_ir_output_command(
-                                source_file["compiler_flags"])
-                            if not compilation_command:
-                                continue
-
-                            source_ir = generate_ir_for_source_file(source_file["directory"],
-                                                                compilation_command)
-                            if source_ir:
-                                source_file["ir_generation_return_code"] = source_ir.returncode
-                                source_file["llvm_ir"] = source_ir.stdout
-                                source_file["ir_generation_stderr"] = source_ir.stderr
-
-                                if source_ir.returncode == 0 and source_ir.stdout and source_file["random_function"]:
-                                    function_ir = generate_ir_for_function(source_ir.stdout,
-                                                                        random_function['name'])
-                                    if function_ir:
-                                        source_file["random_func_ir_generation_return_code"] = (
-                                            function_ir.returncode)
-                                        source_file["random_func_llvm_ir"] = function_ir.stdout
-                                        source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+                    compilation_data = ir_processing_for_package(compilation_data)
 
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -269,59 +272,7 @@ def process_package(package, package_subdir):
                 compilation_data = extract_compilation_commands(package_subdir.path)
 
                 if compilation_data:
-                    for source_file in compilation_data:
-                        source_file["functions"] = None
-                        source_file["random_function"] = None
-                        source_file["ir_generation_return_code"] = 3
-                        source_file["llvm_ir"] = None
-                        source_file["ir_generation_stderr"] = None
-                        source_file["random_func_ir_generation_return_code"] = 3
-                        source_file["random_func_llvm_ir"] = None
-                        source_file["random_func_ir_generation_stderr"] = None
-
-                        if (not os.path.exists(source_file["source_file"])
-                            or not os.path.exists(source_file["directory"])
-                            or source_file["source_file"].split('/')[-1] in
-                            ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
-                            "CMakeCXXCompilerABI.cpp"]
-                            or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
-                                                                        "testing", "unittest",
-                                                                        "ctest", "check",
-                                                                        "test-suite", "testsuite",
-                                                                        "regression"]
-                            or "test" in source_file["source_file"].split('/')[-1].lower()
-                            or "testing" in source_file["source_file"].split('/')[-1].lower()):
-                            continue
-
-                        functions = extract_function_from_source(source_file["source_file"])
-                        if functions:
-                            source_file["functions"] = functions
-
-                            random_function = random_function_selector(functions)
-                            if random_function:
-                                source_file["random_function"] = random_function
-
-                        if source_file["compiler_flags"]:
-                            compilation_command = generate_ir_output_command(
-                                source_file["compiler_flags"])
-                            if not compilation_command:
-                                continue
-
-                            source_ir = generate_ir_for_source_file(source_file["directory"],
-                                                                compilation_command)
-                            if source_ir:
-                                source_file["ir_generation_return_code"] = source_ir.returncode
-                                source_file["llvm_ir"] = source_ir.stdout
-                                source_file["ir_generation_stderr"] = source_ir.stderr
-
-                                if source_ir.returncode == 0 and source_ir.stdout and source_file["random_function"]:
-                                    function_ir = generate_ir_for_function(source_ir.stdout,
-                                                                        random_function['name'])
-                                    if function_ir:
-                                        source_file["random_func_ir_generation_return_code"] = (
-                                            function_ir.returncode)
-                                        source_file["random_func_llvm_ir"] = function_ir.stdout
-                                        source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+                    compilation_data = ir_processing_for_package(compilation_data)
 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
