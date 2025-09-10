@@ -10,6 +10,7 @@ Functions:
 """
 
 from clang.cindex import CursorKind, Index, TypeKind
+import llvmlite.binding as llvm
 
 #TODO: See if parsing LLVM IR for function name extraction is better
 
@@ -25,10 +26,10 @@ def extract_function_from_source(source_file):
 
             if not cursor.location.file or cursor.location.file.name != source_file:
                 continue
-            
+
             if cursor.kind != CursorKind.FUNCTION_DECL:
                 continue
-            
+
             result_type = cursor.type.get_result()
 
             function_info = {
@@ -36,7 +37,7 @@ def extract_function_from_source(source_file):
                 "return_type": result_type.kind.spelling,
                 "arguments": []
             }
-            
+
             if cursor.type.kind == TypeKind.FUNCTIONNOPROTO:
                 function_info["arguments"] = None
             else:
@@ -49,10 +50,48 @@ def extract_function_from_source(source_file):
     except Exception as e:
         print(f"Function Extractor error: {e}")
 
-if __name__ == "__main__":
-    source_file_path = "./test.c"
+def extract_function_from_ir(ir_code):
+    try:
+        functions = []
 
-    functions = extract_function_from_source(source_file_path)
+        llvm.initialize_native_target()
+        llvm.initialize_native_asmprinter()
+
+        module = llvm.parse_assembly(ir_code)
+
+        for func in module.functions:
+            if func.is_declaration:
+                continue
+
+            func_type = func.type
+
+
+            if func_type.is_pointer:
+                func_type = func_type.element_type
+
+
+            type_elements = list(func_type.elements)
+
+            function_info = {
+                "name": func.name,
+                "return_type": str(type_elements[0]) if type_elements else "void",
+                "arguments": [str(arg_type) for arg_type in type_elements[1:]] if len(type_elements) > 1 else []
+            }
+
+            functions.append(function_info)
+
+        return functions
+
+    except Exception as e:
+        print(f"IR Function Extractor error: {e}")
+        return []
+
+if __name__ == "__main__":
+    ir_code = r"""
+
+"""
+
+    functions = extract_function_from_ir(ir_code)
 
     for func in functions:
         print(f"Function: {func['name']}")
