@@ -7,6 +7,7 @@ Description:
 
 Functions:
     extract_functions_from_source() - Parse source file and return function names
+    extract_functions_from_ir() - Parse LLVM IR code and return function names
 """
 
 from clang.cindex import CursorKind, Index, TypeKind
@@ -22,33 +23,40 @@ def extract_function_from_source(source_file):
         index = Index.create()
         translation_unit = index.parse(source_file)
 
-        for cursor in translation_unit.cursor.get_children():
+        def traverse_cursor(cursor):
 
-            if not cursor.location.file or cursor.location.file.name != source_file:
-                continue
+            if cursor.location.file and cursor.location.file.name == source_file:
 
-            if cursor.kind != CursorKind.FUNCTION_DECL:
-                continue
+                if cursor.kind in [CursorKind.FUNCTION_DECL, CursorKind.CXX_METHOD,
+                                CursorKind.CONSTRUCTOR, CursorKind.DESTRUCTOR]:
 
-            result_type = cursor.type.get_result()
+                    result_type = cursor.type.get_result()
 
-            function_info = {
-                "name": cursor.spelling,
-                "return_type": result_type.kind.spelling,
-                "arguments": []
-            }
+                    function_info = {
+                        "name": cursor.spelling,
+                        "return_type": result_type.spelling if result_type else "void",
+                        "arguments": []
+                    }
 
-            if cursor.type.kind == TypeKind.FUNCTIONNOPROTO:
-                function_info["arguments"] = None
-            else:
-                for arg_type in cursor.type.argument_types():
-                    function_info["arguments"].append(arg_type.kind.spelling)
+                    if cursor.type.kind == TypeKind.FUNCTIONNOPROTO:
+                        function_info["arguments"] = None
+                    else:
+                        for arg_type in cursor.type.argument_types():
+                            function_info["arguments"].append(arg_type.spelling)
 
-            functions.append(function_info)
+                    functions.append(function_info)
+
+
+            for child in cursor.get_children():
+                traverse_cursor(child)
+
+
+        traverse_cursor(translation_unit.cursor)
 
         return functions
     except Exception as e:
         print(f"Function Extractor error: {e}")
+        return []
 
 def extract_function_from_ir(ir_code):
     try:
@@ -87,11 +95,10 @@ def extract_function_from_ir(ir_code):
         return []
 
 if __name__ == "__main__":
-    ir_code = r"""
 
-"""
+    source_file = "test.cpp" 
 
-    functions = extract_function_from_ir(ir_code)
+    functions = extract_function_from_source(source_file)
 
     for func in functions:
         print(f"Function: {func['name']}")
