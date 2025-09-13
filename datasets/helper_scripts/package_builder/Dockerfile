@@ -36,9 +36,20 @@ RUN apt-get update && apt-get install -y \
     python3-debugpy \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python Packages
+RUN pip install \
+    cxxfilt
+
 # Install errcheck Go static analysis tool, for the testing framework
 RUN go install github.com/kisielk/errcheck@v1.7.0
 
 WORKDIR /worker
 
-COPY test_framework/debian_package_tester.py package_builder/build_worker.py package_builder/process_package.py test_framework/test_output_parser.py ir_processing/function_extractor.py ir_processing/random_function_selector.py ir_processing/IR_extractor.py /worker/
+COPY test_framework/debian_package_tester.py \
+    package_builder/build_worker.py \
+    package_builder/process_package.py \
+    test_framework/test_output_parser.py \
+    ir_processing/function_extractor.py \
+    ir_processing/random_function_selector.py \
+    ir_processing/IR_extractor.py \
+    /worker/
