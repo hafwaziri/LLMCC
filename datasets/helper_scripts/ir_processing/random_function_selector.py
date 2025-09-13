@@ -14,23 +14,48 @@ Functions:
 import random
 
 #TODO: See if its better to select certain functions for IR Processing
-def random_function_selector(functions, random_seed=None):
+def random_function_selector(functions_from_source, functions_from_ir, random_seed=None):
 
-    if random_seed == None:
+    if random_seed is None:
         random_seed = 42
 
     random.seed(random_seed)
 
     try:
-        if functions:
-            return random.choice(functions)
+        if functions_from_source and functions_from_ir:
+
+            ir_base_to_full = {}
+
+            for ir_func in functions_from_ir:
+
+                base_name = ir_func
+
+                if '(' in base_name:
+                    base_name = base_name.split('(')[0]
+
+                if '::' in base_name:
+                    base_name = base_name.split('::')[-1]
+
+                if base_name in ir_base_to_full:
+                    ir_base_to_full[base_name] = None
+                else:
+                    ir_base_to_full[base_name] = ir_func
+
+            valid_functions = []
+            for source_func in functions_from_source:
+                if source_func in ir_base_to_full and ir_base_to_full[source_func] is not None:
+                    valid_functions.append(ir_base_to_full[source_func])
+
+            if valid_functions:
+                return random.choice(valid_functions)
+
         return None
     except Exception as e:
         print(f"Random Function Extractor error: {e}")
 
 if __name__ == "__main__":
+    pass
 
+    # functions = []
 
-    functions = []
-
-    random_function = random_function_selector(functions)
+    # random_function = random_function_selector(functions)
