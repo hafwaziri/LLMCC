@@ -44,14 +44,15 @@ def random_function_selector(functions_from_source, functions_from_ir, random_se
             valid_functions = []
             for source_func in functions_from_source:
                 if source_func in ir_base_to_full and ir_base_to_full[source_func] is not None:
-                    valid_functions.append(ir_base_to_full[source_func])
+                    valid_functions.append((source_func, ir_base_to_full[source_func]))
 
             if valid_functions:
                 return random.choice(valid_functions)
 
-        return None
+        return None, None
     except Exception as e:
         print(f"Random Function Extractor error: {e}")
+        return None, None
 
 if __name__ == "__main__":
     pass

@@ -1,9 +1,9 @@
 import sys
 import json
 import os
-from process_package import process_package
 import traceback
 import debugpy
+from process_package import process_package
 
 class Package:
     def __init__(self, path, name):
@@ -18,21 +18,21 @@ if __name__ == "__main__":
     try:
         package_dir = sys.argv[1]
         sub_dir = sys.argv[2]
-        
+
         package_name = os.path.basename(package_dir.rstrip('/'))
-        
+
         package = Package(package_dir, package_name)
         package_subdir = Package(sub_dir, package_name)
-        
+
         result = process_package(package, package_subdir)
-        
+
         json.dump(result, sys.stdout)
         sys.stdout.flush()
-        
+
     except Exception as e:
         print(f"Exception occurred: {str(e)}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        
+
         error_result = (
             "unknown",     # build_system
             "",           # dh_auto_config

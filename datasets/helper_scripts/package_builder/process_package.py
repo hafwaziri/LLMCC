@@ -4,10 +4,11 @@ import subprocess
 import traceback
 import json
 from debian_package_tester import test_package
-from function_extractor import extract_function_from_source
+from function_extractor import extract_function_from_source, extract_function_from_ir, demangle_symbols
 from random_function_selector import random_function_selector
 from IR_extractor import generate_ir_for_source_file, generate_ir_for_function
 from IR_extractor import generate_ir_output_command
+import debugpy
 
 
 #TODO: Remove Magic Numbers
@@ -132,7 +133,8 @@ def extract_compilation_commands(package_subdir):
 
 def ir_processing_for_package(compilation_data):
     for source_file in compilation_data:
-        source_file["functions"] = None
+        source_file["source_functions"] = None
+        source_file["ir_functions"] = None
         source_file["random_function"] = None
         source_file["ir_generation_return_code"] = 3
         source_file["llvm_ir"] = None
@@ -155,13 +157,18 @@ def ir_processing_for_package(compilation_data):
             or "testing" in source_file["source_file"].split('/')[-1].lower()):
             continue
 
-        functions = extract_function_from_source(source_file["source_file"])
-        if functions:
-            source_file["functions"] = functions
+        # if source_file["source_file"].split('/')[-1] == "EbmlCrc32.cpp":
+        #     debugpy.breakpoint()
 
-            random_function = random_function_selector(functions)
-            if random_function:
-                source_file["random_function"] = random_function
+        all_clang_flags = source_file["compiler_flags"][1:]
+        clang_flags = [flag for flag in all_clang_flags
+                       if flag.startswith(("-I", "-D", "-std="))]
+
+        source_file_functions = extract_function_from_source(source_file["source_file"],
+                                                            clang_flags,
+                                                            source_file["directory"])
+        if source_file_functions:
+            source_file["source_functions"] = source_file_functions
 
         if source_file["compiler_flags"]:
             compilation_command = generate_ir_output_command(
@@ -176,10 +183,42 @@ def ir_processing_for_package(compilation_data):
                 source_file["llvm_ir"] = source_ir.stdout
                 source_file["ir_generation_stderr"] = source_ir.stderr
 
+                demangled_to_mangled = {}
+                ir_file_functions = extract_function_from_ir(source_ir.stdout)
+                if ir_file_functions:
+                    demangled_functions = demangle_symbols(ir_file_functions)
+
+                    ir_function_names = [func['name'] for func in ir_file_functions]
+                    demangled_function_names = [func['name'] for func in demangled_functions]
+
+                    for original, demangled in zip(ir_function_names, demangled_function_names):
+                        demangled_to_mangled[demangled] = original
+
+
+                    source_file["ir_functions"] = demangled_functions
+
+                source_function_names = [func['name'] for func in source_file["source_functions"]] if source_file["source_functions"] else None
+                ir_function_names = [func['name'] for func in source_file["ir_functions"]] if source_file["ir_functions"] else None
+
+                source_function_name, ir_function_name = random_function_selector(
+                    source_function_names,
+                    ir_function_names
+                    )
+
+                if source_function_name and ir_function_name:
+                    random_function_dict = None
+                    if source_file["source_functions"]:
+                        for func in source_file["source_functions"]:
+                            if func['name'] == source_function_name:
+                                random_function_dict = func
+                                break
+                    source_file["random_function"] = random_function_dict
+
                 if (source_ir.returncode == 0
                     and source_ir.stdout and source_file["random_function"]):
+                    mangled_function_name = demangled_to_mangled.get(ir_function_name, ir_function_name)
                     function_ir = generate_ir_for_function(source_ir.stdout,
-                                                        random_function['name'])
+                                                        mangled_function_name)
                     if function_ir:
                         source_file["random_func_ir_generation_return_code"] = (
                             function_ir.returncode)

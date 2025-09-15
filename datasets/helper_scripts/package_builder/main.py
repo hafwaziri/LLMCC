@@ -10,6 +10,8 @@ import debugpy
 
 def process_package(package_dir, sub_dir):
 
+    # debugpy.breakpoint()
+
     package_path = os.path.abspath(package_dir.path)
     sub_dir_path = os.path.abspath(sub_dir.path)
 
@@ -53,16 +55,17 @@ def process_package(package_dir, sub_dir):
             for comp_info in compilation_data:
                 cursor_local.execute("""
                     INSERT OR REPLACE INTO source_files (
-                        file_path, package_name, compilation_command, output_file, functions, random_function, 
+                        file_path, package_name, compilation_command, output_file, src_functions, ir_functions, random_function, 
                         IR_generation_return_code, LLVM_IR, IR_generation_stderr, random_function_IR_generation_return_code,
                         random_function_IR, random_function_IR_stderr
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
                     ' '.join(comp_info['compiler_flags']),
                     comp_info['output_file'],
-                    json.dumps(comp_info['functions']) if comp_info['functions'] is not None else None,
+                    json.dumps(comp_info['source_functions']) if comp_info['source_functions'] is not None else None,
+                    json.dumps(comp_info['ir_functions']) if comp_info['ir_functions'] is not None else None,
                     json.dumps(comp_info['random_function']) if comp_info['random_function'] is not None else None,
                     comp_info['ir_generation_return_code'],
                     comp_info['llvm_ir'],
@@ -98,7 +101,7 @@ def traverse_dir(root):
         for dir, sub_dir in packages:
             future = executor.submit(process_package, dir, sub_dir)
             futures.append(future)
-            
+
         results = []
         for future in tqdm(
             futures,
@@ -144,7 +147,8 @@ def main():
         package_name TEXT,
         compilation_command TEXT,
         output_file TEXT,
-        functions TEXT,
+        src_functions TEXT,
+        ir_functions TEXT,
         random_function TEXT,
         IR_generation_return_code INTEGER,
         LLVM_IR TEXT,
@@ -163,6 +167,7 @@ def main():
     traverse_dir(root_dir)
 
 if __name__ == "__main__":
-    # debugpy.listen(("0.0.0.0", 5679))
+    # debugpy.listen(("0.0.0.0", 5690))
     # debugpy.wait_for_client()
+
     main()

@@ -19,7 +19,7 @@ def generate_ir_output_command(original_compilation_command):
         parts = original_compilation_command.copy()
     else:
         raise ValueError("compilation_command must be a string or list")
- 
+
     parts[0] = "/usr/bin/clang"
 
     filtered_parts = []
@@ -65,7 +65,7 @@ def generate_ir_for_function(source_ir, function_name):
                                  input=source_ir,
                                  capture_output=True,
                                  text=True,
-                                 Check=False)
+                                 check=False)
         return LLVM_IR
     except Exception as e:
         print(f"Generate IR for a Function error: {e}")
@@ -90,9 +90,9 @@ if __name__ == "__main__":
     # print(Function_IR.stdout)
 
     original_compilation_command = ''''''
-    cleaned_comp_command = generate_ir_output_command(original_compilation_command)
-    print(cleaned_comp_command)
+    # cleaned_comp_command = generate_ir_output_command(original_compilation_command)
+    # print(cleaned_comp_command)
 
-    source_file = ""
-    generated_IR = generate_ir_for_source_file(source_file, cleaned_comp_command)
-    print(generated_IR)
+    # source_file = ""
+    # generated_IR = generate_ir_for_source_file(source_file, cleaned_comp_command)
+    # print(generated_IR)
