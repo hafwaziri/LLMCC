@@ -25,6 +25,8 @@ def generate_ir_output_command(original_compilation_command):
     filtered_parts = []
     skip_next = False
 
+    optimization_flags = {"-O0", "-O1", "-O2", "-O3", "-Os", "-Oz", "-Ofast", "-Og"}
+
     for i, part in enumerate(parts):
         if skip_next:
             skip_next= False
@@ -37,9 +39,12 @@ def generate_ir_output_command(original_compilation_command):
         if part == "-c":
             continue
 
+        if part in optimization_flags:
+            continue
+
         filtered_parts.append(part)
 
-    filtered_parts.extend(["-S", "-emit-llvm", "-o", "-"])
+    filtered_parts.extend(["-O0", "-S", "-emit-llvm", "-o", "-"])
 
     return filtered_parts
 
