@@ -13,16 +13,27 @@ Functions:
 from clang.cindex import CursorKind, Index, TypeKind
 import llvmlite.binding as llvm
 import cxxfilt
+import os
 
 #TODO: See if parsing LLVM IR for function name extraction is better
 
 #Guide for extracting type metadata using the python binding for libclang : https://gregoryszorc.com/blog/2012/05/14/python-bindings-updates-in-clang-3.1/
-def extract_function_from_source(source_file):
+def extract_function_from_source(source_file, compiler_args=None, build_directory=None):
+
+    if compiler_args is None:
+        compiler_args = []
+
+    original_cwd = os.getcwd()
+
     try:
+
+        if build_directory and os.path.isdir(build_directory):
+            os.chdir(build_directory)
+
         functions = []
 
         index = Index.create()
-        translation_unit = index.parse(source_file)
+        translation_unit = index.parse(source_file, args=compiler_args)
 
         def traverse_cursor(cursor):
 
@@ -58,6 +69,8 @@ def extract_function_from_source(source_file):
     except Exception as e:
         print(f"Function Extractor error: {e}")
         return []
+    finally:
+        os.chdir(original_cwd)
 
 def extract_function_from_ir(ir_code):
     try:
@@ -114,20 +127,31 @@ if __name__ == "__main__":
 
 '''
 
-    functions = extract_function_from_ir(source_ir)
+    # source_path = ''
 
-    for func in functions:
-        print(f"Function: {func['name']}")
-        print(f"  Return type: {func['return_type']}")
-        print(f"  Arguments: {func['arguments']}")
-        print()
+    # functions = extract_function_from_ir(source_ir)
+    # functions_2 = extract_function_from_source(source_path)
 
-    print('#'*50)
-    print("\nAfter Demangling:\n")
+    # for func in functions:
+    #     print(f"Function: {func['name']}")
+    #     print(f"  Return type: {func['return_type']}")
+    #     print(f"  Arguments: {func['arguments']}")
+    #     print()
 
-    demangled = demangle_symbols(functions)
-    for func in demangled:
-        print(f"Function: {func['name']}")
-        print(f"  Return type: {func['return_type']}")
-        print(f"  Arguments: {func['arguments']}")
-        print()
+    # print('#'*50)
+    # print("\nAfter Demangling:\n")
+
+    # demangled = demangle_symbols(functions)
+    # for func in demangled:
+    #     print(f"Function: {func['name']}")
+    #     print(f"  Return type: {func['return_type']}")
+    #     print(f"  Arguments: {func['arguments']}")
+    #     print()
+
+    # print('#'*50)
+    # print("\nFrom Source File:\n")
+    # for func in functions_2:
+    #     print(f"Function: {func['name']}")
+    #     print(f"  Return type: {func['return_type']}")
+    #     print(f"  Arguments: {func['arguments']}")
+    #     print()
