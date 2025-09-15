@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     python-is-python3 \
     python2.7 \
     python3-clang \
+    python3-pip \
     #gnustep-devel \
     #gnustep-make \
     #gnustep-common \
@@ -37,8 +38,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python Packages
-RUN pip install \
-    cxxfilt
+RUN pip install --break-system-packages \
+    cxxfilt \
+    llvmlite
 
 # Install errcheck Go static analysis tool, for the testing framework
 RUN go install github.com/kisielk/errcheck@v1.7.0
