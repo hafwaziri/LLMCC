@@ -45,6 +45,9 @@ def generate_ir_output_command(original_compilation_command):
         if part.startswith("-W"):
             continue
 
+        if part.startswith("-f"):
+            continue
+
         filtered_parts.append(part)
 
     filtered_parts.extend(["-O0", "-S", "-emit-llvm", "-o", "-"])
