@@ -157,9 +157,6 @@ def ir_processing_for_package(compilation_data):
             or "testing" in source_file["source_file"].split('/')[-1].lower()):
             continue
 
-        # if source_file["source_file"].split('/')[-1] == "EbmlCrc32.cpp":
-        #     debugpy.breakpoint()
-
         all_clang_flags = source_file["compiler_flags"][1:]
         clang_flags = [flag for flag in all_clang_flags
                        if flag.startswith(("-I", "-D", "-std="))]

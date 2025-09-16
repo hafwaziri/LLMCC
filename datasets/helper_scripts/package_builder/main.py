@@ -78,7 +78,7 @@ def process_package(package_dir, sub_dir):
         return True
     except json.JSONDecodeError as e:
         print(f"JSON decode error for {package_name}: {e}")
-        # print(f"Raw output: {result.stdout!r}")
+        print(f"Raw output: {result.stdout!r}")
         return False
     except Exception as e:
         print(f"Exception in package: {package_name}: {e}")

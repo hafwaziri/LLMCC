@@ -10,10 +10,10 @@ Functions:
     extract_functions_from_ir() - Parse LLVM IR code and return function names
 """
 
+import os
 from clang.cindex import CursorKind, Index, TypeKind
 import llvmlite.binding as llvm
 import cxxfilt
-import os
 
 #TODO: See if parsing LLVM IR for function name extraction is better
 
@@ -50,11 +50,12 @@ def extract_function_from_source(source_file, compiler_args=None, build_director
                         "arguments": []
                     }
 
-                    if cursor.type.kind == TypeKind.FUNCTIONNOPROTO:
+                    for child in cursor.get_children():
+                        if child.kind == CursorKind.PARM_DECL:
+                            function_info["arguments"].append(child.type.spelling)
+
+                    if not function_info["arguments"] and cursor.type.kind == TypeKind.FUNCTIONNOPROTO:
                         function_info["arguments"] = None
-                    else:
-                        for arg_type in cursor.type.argument_types():
-                            function_info["arguments"].append(arg_type.spelling)
 
                     functions.append(function_info)
 
@@ -67,7 +68,7 @@ def extract_function_from_source(source_file, compiler_args=None, build_director
 
         return functions
     except Exception as e:
-        print(f"Function Extractor error: {e}")
+        # print(f"Function Extractor error: {e}")
         return []
     finally:
         os.chdir(original_cwd)
@@ -105,7 +106,7 @@ def extract_function_from_ir(ir_code):
         return functions
 
     except Exception as e:
-        print(f"IR Function Extractor error: {e}")
+        # print(f"IR Function Extractor error: {e}")
         return []
 
 def demangle_symbols(functions):
@@ -118,7 +119,7 @@ def demangle_symbols(functions):
             demangled_functions.append(demangled_func)
         return demangled_functions
     except Exception as e:
-        print(f"Demangling error: {e}")
+        # print(f"Demangling error: {e}")
         return functions
 
 if __name__ == "__main__":
@@ -127,10 +128,10 @@ if __name__ == "__main__":
 
 '''
 
-    # source_path = ''
+    source_path = '/worker/ocaml-dune-2.9.3/_build/default/src/stdune/fcntl_stubs.c'
 
     # functions = extract_function_from_ir(source_ir)
-    # functions_2 = extract_function_from_source(source_path)
+    functions_2 = extract_function_from_source(source_path)
 
     # for func in functions:
     #     print(f"Function: {func['name']}")
@@ -149,9 +150,9 @@ if __name__ == "__main__":
     #     print()
 
     # print('#'*50)
-    # print("\nFrom Source File:\n")
-    # for func in functions_2:
-    #     print(f"Function: {func['name']}")
-    #     print(f"  Return type: {func['return_type']}")
-    #     print(f"  Arguments: {func['arguments']}")
-    #     print()
+    print("\nFrom Source File:\n")
+    for func in functions_2:
+        print(f"Function: {func['name']}")
+        print(f"  Return type: {func['return_type']}")
+        print(f"  Arguments: {func['arguments']}")
+        print()
