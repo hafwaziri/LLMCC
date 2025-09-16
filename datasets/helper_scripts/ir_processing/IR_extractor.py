@@ -42,6 +42,9 @@ def generate_ir_output_command(original_compilation_command):
         if part in optimization_flags:
             continue
 
+        if part.startswith("-W"):
+            continue
+
         filtered_parts.append(part)
 
     filtered_parts.extend(["-O0", "-S", "-emit-llvm", "-o", "-"])
