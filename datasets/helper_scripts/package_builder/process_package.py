@@ -3,6 +3,7 @@ import sys
 import subprocess
 import traceback
 import json
+import time
 from debian_package_tester import test_package
 from function_extractor import extract_function_from_source, extract_function_from_ir, demangle_symbols
 from random_function_selector import random_function_selector
@@ -144,6 +145,7 @@ def ir_processing_for_package(compilation_data):
         source_file["random_func_llvm_ir"] = None
         source_file["random_func_ir_generation_stderr"] = None
         source_file["object_file_generation_return_code"] = 3
+        source_file["timestamp_check"] = 0
 
         if (not os.path.exists(source_file["source_file"])
             or not os.path.exists(source_file["directory"])
@@ -230,8 +232,12 @@ def ir_processing_for_package(compilation_data):
                     and source_file["output_file"]
                     and os.path.exists(source_file["output_file"])):
 
+                    original_mtime = os.path.getmtime(source_file["output_file"])
+
                     compilation_command_for_o = source_file["compiler_flags"].copy()
                     compilation_command_for_o[0] = "clang"
+
+                    time.sleep(0.1) #Ensure timestamp difference
 
                     object_file_generation_result = ir_to_o(
                         source_ir.stdout,
@@ -243,6 +249,10 @@ def ir_processing_for_package(compilation_data):
                     source_file["object_file_generation_return_code"] = (
                         object_file_generation_result.returncode
                     )
+
+                    if os.path.exists(source_file["output_file"]):
+                        new_mtime = os.path.getmtime(source_file["output_file"])
+                        source_file["timestamp_check"] = new_mtime > original_mtime
 
 
     return compilation_data
