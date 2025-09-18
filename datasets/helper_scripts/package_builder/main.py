@@ -57,8 +57,8 @@ def process_package(package_dir, sub_dir):
                     INSERT OR REPLACE INTO source_files (
                         file_path, package_name, compilation_command, output_file, src_functions, ir_functions, random_function, 
                         IR_generation_return_code, LLVM_IR, IR_generation_stderr, random_function_IR_generation_return_code,
-                        random_function_IR, random_function_IR_stderr
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        random_function_IR, random_function_IR_stderr, object_file_generation_return_code
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
@@ -72,7 +72,8 @@ def process_package(package_dir, sub_dir):
                     comp_info['ir_generation_stderr'],
                     comp_info['random_func_ir_generation_return_code'],
                     comp_info['random_func_llvm_ir'],
-                    comp_info['random_func_ir_generation_stderr']
+                    comp_info['random_func_ir_generation_stderr'],
+                    comp_info['object_file_generation_return_code']
                 ))
             conn_local.commit()
         return True
@@ -156,6 +157,7 @@ def main():
         random_function_IR_generation_return_code INTEGER,
         random_function_IR TEXT,
         random_function_IR_stderr TEXT,
+        object_file_generation_return_code INTEGER,
         PRIMARY KEY (package_name, file_path),
         FOREIGN KEY (package_name) REFERENCES packages (name)
     )

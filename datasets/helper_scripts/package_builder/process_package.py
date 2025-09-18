@@ -8,6 +8,7 @@ from function_extractor import extract_function_from_source, extract_function_fr
 from random_function_selector import random_function_selector
 from IR_extractor import generate_ir_for_source_file, generate_ir_for_function
 from IR_extractor import generate_ir_output_command
+from ir2o import ir_to_o
 import debugpy
 
 
@@ -142,6 +143,7 @@ def ir_processing_for_package(compilation_data):
         source_file["random_func_ir_generation_return_code"] = 3
         source_file["random_func_llvm_ir"] = None
         source_file["random_func_ir_generation_stderr"] = None
+        source_file["object_file_generation_return_code"] = 3
 
         if (not os.path.exists(source_file["source_file"])
             or not os.path.exists(source_file["directory"])
@@ -213,7 +215,8 @@ def ir_processing_for_package(compilation_data):
 
                 if (source_ir.returncode == 0
                     and source_ir.stdout and source_file["random_function"]):
-                    mangled_function_name = demangled_to_mangled.get(ir_function_name, ir_function_name)
+                    mangled_function_name = demangled_to_mangled.get(ir_function_name,
+                                                                    ir_function_name)
                     function_ir = generate_ir_for_function(source_ir.stdout,
                                                         mangled_function_name)
                     if function_ir:
@@ -221,6 +224,27 @@ def ir_processing_for_package(compilation_data):
                             function_ir.returncode)
                         source_file["random_func_llvm_ir"] = function_ir.stdout
                         source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+
+                if (source_ir.returncode == 0
+                    and source_ir.stdout
+                    and source_file["output_file"]
+                    and os.path.exists(source_file["output_file"])):
+
+                    compilation_command_for_o = source_file["compiler_flags"].copy()
+                    compilation_command_for_o[0] = "clang"
+
+                    object_file_generation_result = ir_to_o(
+                        source_ir.stdout,
+                        compilation_command_for_o,
+                        source_file["output_file"],
+                        source_file["directory"]
+                    )
+
+                    source_file["object_file_generation_return_code"] = (
+                        object_file_generation_result.returncode
+                    )
+
+
     return compilation_data
 
 def process_package(package, package_subdir):
