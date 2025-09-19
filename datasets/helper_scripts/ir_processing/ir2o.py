@@ -3,13 +3,13 @@ import tempfile
 import os
 
 def ir_to_o(ir, compilation_command, output_file, src_directory):
-
     with tempfile.NamedTemporaryFile(mode='w', suffix='.ll', delete=False) as temp_ir:
         temp_ir.write(ir)
         temp_ir.flush()
 
+    # Create a copy to avoid modifying the original
+    compilation_command = compilation_command.copy()
     compilation_command[-1] = temp_ir.name
-
 
     result = subprocess.run(
         compilation_command,
@@ -18,7 +18,6 @@ def ir_to_o(ir, compilation_command, output_file, src_directory):
     )
 
     os.unlink(temp_ir.name)
-
     return result
 
 if __name__ == "__main__":
@@ -39,7 +38,7 @@ target triple = "x86_64-pc-linux-gnu"
 @.str = private unnamed_addr constant [1 x i8] zeroinitializer, align 1
 @.str.1 = private unnamed_addr constant [6 x i8] c"hello\00", align 1
 @.str.2 = private unnamed_addr constant [18 x i8] c"/usr/share/locale\00", align 1
-@.str.3 = private unnamed_addr constant [20 x i8] c"Hellooooooo, world!\00", align 1
+@.str.3 = private unnamed_addr constant [21 x i8] c"Hellooooooo, woorld!\00", align 1
 @.str.4 = private unnamed_addr constant [6 x i8] c"g:htv\00", align 1
 @longopts = internal constant [5 x %struct.option] [%struct.option { i8* getelementptr inbounds ([9 x i8], [9 x i8]* @.str.10, i32 0, i32 0), i32 1, i32* null, i32 103 }, %struct.option { i8* getelementptr inbounds ([5 x i8], [5 x i8]* @.str.11, i32 0, i32 0), i32 0, i32* null, i32 104 }, %struct.option { i8* getelementptr inbounds ([12 x i8], [12 x i8]* @.str.12, i32 0, i32 0), i32 0, i32* null, i32 116 }, %struct.option { i8* getelementptr inbounds ([8 x i8], [8 x i8]* @.str.13, i32 0, i32 0), i32 0, i32* null, i32 118 }, %struct.option zeroinitializer], align 16, !dbg !0
 @optarg = external global i8*, align 8

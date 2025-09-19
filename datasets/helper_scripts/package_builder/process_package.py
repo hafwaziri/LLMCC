@@ -40,17 +40,29 @@ def run_dh_command(command, package, no_act=True):
     except Exception as e:
         return f"ERROR: {str(e)}"
 
-def build_package(package):
+def build_package(package, no_preclean=None):
     try:
+
+        if no_preclean:
         # Bear also used to capture compilation flags
-        result = subprocess.run(["bear", "--", "dpkg-buildpackage", "-b", "-uc", "-us"],
-                                cwd=package.path,
-                                capture_output=True,
-                                text=True,
-                                shell=False,
-                                timeout=BUILD_TIMEOUT,
-                                check=False
-                                )
+            result = subprocess.run(["dpkg-buildpackage", "-b", "-uc", "-us", "-nc"],
+                                    cwd=package.path,
+                                    capture_output=True,
+                                    text=True,
+                                    shell=False,
+                                    timeout=BUILD_TIMEOUT,
+                                    check=False
+                                    )
+
+        else:
+            result = subprocess.run(["bear", "--", "dpkg-buildpackage", "-b", "-uc", "-us"],
+                                    cwd=package.path,
+                                    capture_output=True,
+                                    text=True,
+                                    shell=False,
+                                    timeout=BUILD_TIMEOUT,
+                                    check=False
+                                    )
 
         return result.stderr, result.returncode
     except subprocess.TimeoutExpired:
@@ -96,13 +108,13 @@ deb-src https://deb.debian.org/debian bookworm-updates main non-free-firmware"""
             f.write(sources_content)
 
         subprocess.run(["sudo", "cp", "/tmp/custom_sources.list", "/etc/apt/sources.list"],
-                     check=True,
-                     timeout=COMMAND_TIMEOUT)
+                    check=True,
+                    timeout=COMMAND_TIMEOUT)
 
         subprocess.run(["sudo", "apt-get", "update"],
-                     check=True,
-                     timeout=COMMAND_TIMEOUT,
-                     capture_output=True)
+                    check=True,
+                    timeout=COMMAND_TIMEOUT,
+                    capture_output=True)
         return True
     except Exception as e:
         print(f"Failed to update sources: {e}", file=sys.stderr)
@@ -163,7 +175,7 @@ def ir_processing_for_package(compilation_data):
 
         all_clang_flags = source_file["compiler_flags"][1:]
         clang_flags = [flag for flag in all_clang_flags
-                       if flag.startswith(("-I", "-D", "-std="))]
+                    if flag.startswith(("-I", "-D", "-std="))]
 
         source_file_functions = extract_function_from_source(source_file["source_file"],
                                                             clang_flags,
@@ -262,7 +274,7 @@ def process_package(package, package_subdir):
     dh_auto_build = ""
     dh_auto_test = ""
     build_stderr = ""
-    build_returncode = 1
+    build_returncode = 3
     test_stdout = ""
     test_stderr = ""
     test_returncode = 3 #Custom return code 3 for when tests are not available, or exceptions occur
@@ -271,6 +283,8 @@ def process_package(package, package_subdir):
     stdout_diff = ""
     stderr_diff = ""
     package_viable_for_test_dataset = 0
+    rebuild_stderr = ""
+    rebuild_returncode = 3
     compilation_data = []
 
     try:
@@ -310,6 +324,18 @@ def process_package(package, package_subdir):
                 if compilation_data:
                     compilation_data = ir_processing_for_package(compilation_data)
 
+                    trigger_relinking = 0
+
+                    for source_file in compilation_data:
+                        if (source_file["object_file_generation_return_code"] == 0
+                            and source_file["timestamp_check"]):
+                            trigger_relinking = 1
+                            break
+
+                    if trigger_relinking:
+                        rebuild_stderr, rebuild_returncode = build_package(package_subdir,
+                                                                    no_preclean=True)
+
         else:
             build_system = detect_build_system(dh_auto_config)
 
@@ -344,6 +370,18 @@ def process_package(package, package_subdir):
                 if compilation_data:
                     compilation_data = ir_processing_for_package(compilation_data)
 
+                    trigger_relinking = 0
+
+                    for source_file in compilation_data:
+                        if (source_file["object_file_generation_return_code"] == 0
+                            and source_file["timestamp_check"]):
+                            trigger_relinking = 1
+                            break
+
+                    if trigger_relinking:
+                        rebuild_stderr, rebuild_returncode = build_package(package_subdir,
+                                                                    no_preclean=True)
+
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
@@ -353,4 +391,4 @@ def process_package(package, package_subdir):
     return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr,
             build_returncode, test_stdout, test_stderr, test_returncode, test_detected,
             testing_framework, stdout_diff, stderr_diff, package_viable_for_test_dataset,
-            compilation_data)
+            rebuild_stderr, rebuild_returncode, compilation_data)
