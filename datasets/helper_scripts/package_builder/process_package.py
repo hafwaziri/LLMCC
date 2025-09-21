@@ -269,6 +269,27 @@ def ir_processing_for_package(compilation_data):
 
     return compilation_data
 
+def override_dh_dwz(package_subdir):
+    try:
+
+        debian_rules_path = os.path.join(package_subdir, "debian", "rules")
+
+        if not os.path.exists(debian_rules_path):
+            return False
+
+        with open(debian_rules_path, 'r') as f:
+            rules_content = f.read()
+            if "override_dh_dwz" in rules_content:
+                return True
+        with open(debian_rules_path, 'a') as f:
+            f.write("\n")
+            f.write("override_dh_dwz:\n")
+
+    except Exception as e:
+        print(f"Failed to override dh_dwz: {e}")
+        return False
+
+
 def process_package(package, package_subdir):
     build_system = "unknown"
     dh_auto_build = ""
@@ -333,6 +354,7 @@ def process_package(package, package_subdir):
                             break
 
                     if trigger_relinking:
+                        override_dh_dwz(package_subdir.path)
                         rebuild_stderr, rebuild_returncode = build_package(package_subdir,
                                                                     no_preclean=True)
 
@@ -379,6 +401,7 @@ def process_package(package, package_subdir):
                             break
 
                     if trigger_relinking:
+                        override_dh_dwz(package_subdir.path)
                         rebuild_stderr, rebuild_returncode = build_package(package_subdir,
                                                                     no_preclean=True)
 

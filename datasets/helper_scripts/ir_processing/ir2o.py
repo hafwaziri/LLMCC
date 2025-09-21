@@ -7,7 +7,6 @@ def ir_to_o(ir, compilation_command, output_file, src_directory):
         temp_ir.write(ir)
         temp_ir.flush()
 
-    # Create a copy to avoid modifying the original
     compilation_command = compilation_command.copy()
     compilation_command[-1] = temp_ir.name
 
@@ -482,7 +481,7 @@ attributes #8 = { nounwind readnone willreturn }
       "temp_ir_file.ll"
     ]
 
-    directory = '/hello/hello-2.10'
+    directory = ''
 
     output_file = 'output.o'
     result = ir_to_o(ir, compilation_command, output_file, directory)
