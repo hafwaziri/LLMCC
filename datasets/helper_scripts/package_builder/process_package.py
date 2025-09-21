@@ -11,6 +11,7 @@ from IR_extractor import generate_ir_for_source_file, generate_ir_for_function
 from IR_extractor import generate_ir_output_command
 from ir2o import ir_to_o
 from nop_injection import ir_injection
+from ir_linker import ir_linker
 import debugpy
 
 
@@ -151,6 +152,7 @@ def ir_processing_for_package(compilation_data):
         source_file["source_functions"] = None
         source_file["ir_functions"] = None
         source_file["random_function"] = None
+        source_file["random_function_mangled"] = None
         source_file["ir_generation_return_code"] = 3
         source_file["llvm_ir"] = None
         source_file["ir_generation_stderr"] = None
@@ -158,7 +160,8 @@ def ir_processing_for_package(compilation_data):
         source_file["random_func_llvm_ir"] = None
         source_file["random_func_ir_generation_stderr"] = None
         source_file["object_file_generation_return_code"] = 3
-        source_file["timestamp_check"] = 0
+        source_file["timestamp_check"] = 0,
+        source_file["relinked_llvm_ir"] = None
 
         if (not os.path.exists(source_file["source_file"])
             or not os.path.exists(source_file["directory"])
@@ -227,6 +230,10 @@ def ir_processing_for_package(compilation_data):
                                 random_function_dict = func
                                 break
                     source_file["random_function"] = random_function_dict
+
+                    mangled_function_name = demangled_to_mangled.get(ir_function_name,
+                                                                    ir_function_name)
+                    source_file["random_function_mangled"] = mangled_function_name
 
                 if (source_ir.returncode == 0
                     and source_ir.stdout and source_file["random_function"]):
@@ -366,6 +373,13 @@ def process_package(package, package_subdir):
                                         source_file['random_func_llvm_ir'],
                                         injection_code='%nop_temp = add i32 0, 0')
                                     source_file['random_func_llvm_ir'] = injected_ir
+                                if source_file['llvm_ir']:
+                                    relinked_ir = ir_linker(
+                                        source_file['llvm_ir'],
+                                        source_file['random_func_llvm_ir'],
+                                        source_file['random_function_mangled']
+                                    )
+                                    source_file['relinked_llvm_ir'] = relinked_ir
 
         else:
             build_system = detect_build_system(dh_auto_config)
@@ -421,6 +435,13 @@ def process_package(package, package_subdir):
                                         source_file['random_func_llvm_ir'],
                                         injection_code='%nop_temp = add i32 0, 0')
                                     source_file['random_func_llvm_ir'] = injected_ir
+                                if source_file['llvm_ir'] and source_file['random_func_llvm_ir']:
+                                    relinked_ir = ir_linker(
+                                        source_file['llvm_ir'],
+                                        source_file['random_func_llvm_ir'],
+                                        source_file['random_function_mangled']
+                                    )
+                                    source_file['relinked_llvm_ir'] = relinked_ir
 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)

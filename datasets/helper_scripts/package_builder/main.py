@@ -56,10 +56,10 @@ def process_package(package_dir, sub_dir):
             for comp_info in compilation_data:
                 cursor_local.execute("""
                     INSERT OR REPLACE INTO source_files (
-                        file_path, package_name, compilation_command, output_file, src_functions, ir_functions, random_function, 
+                        file_path, package_name, compilation_command, output_file, src_functions, ir_functions, random_function, random_function_mangled, 
                         IR_generation_return_code, LLVM_IR, IR_generation_stderr, random_function_IR_generation_return_code,
-                        random_function_IR, random_function_IR_stderr, object_file_generation_return_code, timestamp_check
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        random_function_IR, random_function_IR_stderr, object_file_generation_return_code, timestamp_check, relinked_llvm_ir
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
@@ -68,6 +68,7 @@ def process_package(package_dir, sub_dir):
                     json.dumps(comp_info['source_functions']) if comp_info['source_functions'] is not None else None,
                     json.dumps(comp_info['ir_functions']) if comp_info['ir_functions'] is not None else None,
                     json.dumps(comp_info['random_function']) if comp_info['random_function'] is not None else None,
+                    comp_info['random_function_mangled'],
                     comp_info['ir_generation_return_code'],
                     comp_info['llvm_ir'],
                     comp_info['ir_generation_stderr'],
@@ -75,7 +76,8 @@ def process_package(package_dir, sub_dir):
                     comp_info['random_func_llvm_ir'],
                     comp_info['random_func_ir_generation_stderr'],
                     comp_info['object_file_generation_return_code'],
-                    comp_info['timestamp_check']
+                    comp_info['timestamp_check'],
+                    comp_info['relinked_llvm_ir']
                 ))
             conn_local.commit()
         return True
@@ -155,6 +157,7 @@ def main():
         src_functions TEXT,
         ir_functions TEXT,
         random_function TEXT,
+        random_function_mangled TEXT,
         IR_generation_return_code INTEGER,
         LLVM_IR TEXT,
         IR_generation_stderr TEXT,
@@ -163,6 +166,7 @@ def main():
         random_function_IR_stderr TEXT,
         object_file_generation_return_code INTEGER,
         timestamp_check INTEGER,
+        relinked_llvm_ir TEXT,
         PRIMARY KEY (package_name, file_path),
         FOREIGN KEY (package_name) REFERENCES packages (name)
     )
