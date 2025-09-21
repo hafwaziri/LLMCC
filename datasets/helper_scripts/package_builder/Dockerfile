@@ -55,4 +55,5 @@ COPY test_framework/debian_package_tester.py \
     ir_processing/random_function_selector.py \
     ir_processing/IR_extractor.py \
     ir_processing/ir2o.py \
+    ir_processing/nop_injection.py \
     /worker/

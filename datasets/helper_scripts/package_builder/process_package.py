@@ -10,6 +10,7 @@ from random_function_selector import random_function_selector
 from IR_extractor import generate_ir_for_source_file, generate_ir_for_function
 from IR_extractor import generate_ir_output_command
 from ir2o import ir_to_o
+from nop_injection import ir_injection
 import debugpy
 
 
@@ -358,6 +359,14 @@ def process_package(package, package_subdir):
                         rebuild_stderr, rebuild_returncode = build_package(package_subdir,
                                                                     no_preclean=True)
 
+                        if rebuild_returncode == 0:
+                            for source_file in compilation_data:
+                                if source_file['random_func_llvm_ir']:
+                                    injected_ir = ir_injection(
+                                        source_file['random_func_llvm_ir'],
+                                        injection_code='%nop_temp = add i32 0, 0')
+                                    source_file['random_func_llvm_ir'] = injected_ir
+
         else:
             build_system = detect_build_system(dh_auto_config)
 
@@ -404,6 +413,14 @@ def process_package(package, package_subdir):
                         override_dh_dwz(package_subdir.path)
                         rebuild_stderr, rebuild_returncode = build_package(package_subdir,
                                                                     no_preclean=True)
+
+                        if rebuild_returncode == 0:
+                            for source_file in compilation_data:
+                                if source_file['random_func_llvm_ir']:
+                                    injected_ir = ir_injection(
+                                        source_file['random_func_llvm_ir'],
+                                        injection_code='%nop_temp = add i32 0, 0')
+                                    source_file['random_func_llvm_ir'] = injected_ir
 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
