@@ -160,7 +160,7 @@ def ir_processing_for_package(compilation_data):
         source_file["random_func_llvm_ir"] = None
         source_file["random_func_ir_generation_stderr"] = None
         source_file["object_file_generation_return_code"] = 3
-        source_file["timestamp_check"] = 0,
+        source_file["timestamp_check"] = 0
         source_file["relinked_llvm_ir"] = None
 
         if (not os.path.exists(source_file["source_file"])
