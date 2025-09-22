@@ -162,6 +162,8 @@ def ir_processing_for_package(compilation_data):
         source_file["object_file_generation_return_code"] = 3
         source_file["timestamp_check"] = 0
         source_file["relinked_llvm_ir"] = None
+        source_file["modified_object_file_generation_return_code"] = 3
+        source_file["modified_object_file_timestamp_check"] = 0
 
         if (not os.path.exists(source_file["source_file"])
             or not os.path.exists(source_file["directory"])
@@ -381,6 +383,33 @@ def process_package(package, package_subdir):
                                     )
                                     source_file['relinked_llvm_ir'] = relinked_ir
 
+                                    # TODO: Analyze and Validate modified IR before compilation
+
+                                    if (relinked_ir
+                                        and source_file["output_file"]
+                                        and os.path.exists(source_file["output_file"])):
+
+                                        original_mtime = os.path.getmtime(source_file["output_file"])
+
+                                        compilation_command_for_o = source_file["compiler_flags"].copy()
+                                        compilation_command_for_o[0] = "clang"
+
+                                        time.sleep(0.1)
+
+                                        object_file_generation_result = ir_to_o(
+                                            relinked_ir,
+                                            compilation_command_for_o,
+                                            source_file["output_file"],
+                                            source_file["directory"]
+                                        )
+
+                                        source_file["modified_object_file_generation_return_code"] = (
+                                            object_file_generation_result.returncode
+                                        )
+
+                                        if os.path.exists(source_file["output_file"]):
+                                            new_mtime = os.path.getmtime(source_file["output_file"])
+                                            source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
         else:
             build_system = detect_build_system(dh_auto_config)
 
@@ -442,6 +471,32 @@ def process_package(package, package_subdir):
                                         source_file['random_function_mangled']
                                     )
                                     source_file['relinked_llvm_ir'] = relinked_ir
+
+                                    if (relinked_ir
+                                        and source_file["output_file"]
+                                        and os.path.exists(source_file["output_file"])):
+
+                                        original_mtime = os.path.getmtime(source_file["output_file"])
+
+                                        compilation_command_for_o = source_file["compiler_flags"].copy()
+                                        compilation_command_for_o[0] = "clang"
+
+                                        time.sleep(0.1)
+
+                                        object_file_generation_result = ir_to_o(
+                                            relinked_ir,
+                                            compilation_command_for_o,
+                                            source_file["output_file"],
+                                            source_file["directory"]
+                                        )
+
+                                        source_file["modified_object_file_generation_return_code"] = (
+                                            object_file_generation_result.returncode
+                                        )
+
+                                        if os.path.exists(source_file["output_file"]):
+                                            new_mtime = os.path.getmtime(source_file["output_file"])
+                                            source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
 
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)

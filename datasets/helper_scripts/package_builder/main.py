@@ -58,8 +58,9 @@ def process_package(package_dir, sub_dir):
                     INSERT OR REPLACE INTO source_files (
                         file_path, package_name, compilation_command, output_file, src_functions, ir_functions, random_function, random_function_mangled, 
                         IR_generation_return_code, LLVM_IR, IR_generation_stderr, random_function_IR_generation_return_code,
-                        random_function_IR, random_function_IR_stderr, object_file_generation_return_code, timestamp_check, relinked_llvm_ir
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        random_function_IR, random_function_IR_stderr, object_file_generation_return_code, timestamp_check, relinked_llvm_ir,
+                        modified_object_file_generation_return_code, modified_object_file_timestamp_check
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     comp_info['source_file'],
                     package_name,
@@ -77,7 +78,9 @@ def process_package(package_dir, sub_dir):
                     comp_info['random_func_ir_generation_stderr'],
                     comp_info['object_file_generation_return_code'],
                     comp_info['timestamp_check'],
-                    comp_info['relinked_llvm_ir']
+                    comp_info['relinked_llvm_ir'],
+                    comp_info['modified_object_file_generation_return_code'],
+                    comp_info['modified_object_file_timestamp_check']
                 ))
             conn_local.commit()
         return True
@@ -167,6 +170,8 @@ def main():
         object_file_generation_return_code INTEGER,
         timestamp_check INTEGER,
         relinked_llvm_ir TEXT,
+        modified_object_file_generation_return_code INTEGER,
+        modified_object_file_timestamp_check INTEGER,
         PRIMARY KEY (package_name, file_path),
         FOREIGN KEY (package_name) REFERENCES packages (name)
     )
