@@ -48,7 +48,10 @@ if __name__ == "__main__":
             "",           # stdout_diff
             "",           # stderr_diff
             0,            # package_viable_for_test_dataset,
+            "",           # rebuild_stderr
             3,            # rebuild_returncode
+            "",           # modified_rebuild_stderr
+            3,            # modified_rebuild_returncode
             []            # compilation_data
         )
         json.dump(error_result, sys.stdout)

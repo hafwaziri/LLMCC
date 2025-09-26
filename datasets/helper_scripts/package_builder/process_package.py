@@ -316,6 +316,8 @@ def process_package(package, package_subdir):
     package_viable_for_test_dataset = 0
     rebuild_stderr = ""
     rebuild_returncode = 3
+    modified_rebuild_stderr = ""
+    modified_rebuild_returncode = 3
     compilation_data = []
 
     try:
@@ -410,6 +412,9 @@ def process_package(package, package_subdir):
                                         if os.path.exists(source_file["output_file"]):
                                             new_mtime = os.path.getmtime(source_file["output_file"])
                                             source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
+
+                                        modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
+                                                                                                        no_preclean=True)
         else:
             build_system = detect_build_system(dh_auto_config)
 
@@ -498,6 +503,10 @@ def process_package(package, package_subdir):
                                             new_mtime = os.path.getmtime(source_file["output_file"])
                                             source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
 
+                                        modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
+                                                                                                        no_preclean=True)
+
+
     except Exception as e:
         print(f"Exception in process_package: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
@@ -507,4 +516,5 @@ def process_package(package, package_subdir):
     return (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr,
             build_returncode, test_stdout, test_stderr, test_returncode, test_detected,
             testing_framework, stdout_diff, stderr_diff, package_viable_for_test_dataset,
-            rebuild_stderr, rebuild_returncode, compilation_data)
+            rebuild_stderr, rebuild_returncode, modified_rebuild_stderr,
+            modified_rebuild_returncode, compilation_data)

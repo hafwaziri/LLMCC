@@ -36,7 +36,7 @@ def process_package(package_dir, sub_dir):
         (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode,
         test_stdout, test_stderr, test_returncode, test_detected, testing_framework,
         test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset,
-        rebuild_stderr, rebuild_returncode, compilation_data) = json.loads(result.stdout)
+        rebuild_stderr, rebuild_returncode, modified_rebuild_stderr, modified_rebuild_returncode, compilation_data) = json.loads(result.stdout)
 
         with sqlite3.connect('../../debian_source_test.db') as conn_local:
             cursor_local = conn_local.cursor()
@@ -45,12 +45,12 @@ def process_package(package_dir, sub_dir):
                     name, build_system, dh_auto_configure, dh_auto_build, dh_auto_test,
                     build_stderr, build_return_code, test_stdout, test_stderr, test_returncode,
                     test_detected, testing_framework, test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset,
-                    rebuild_stderr, rebuild_returncode
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    rebuild_stderr, rebuild_returncode, modified_rebuild_stderr, modified_rebuild_returncode
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (package_name, build_system, dh_auto_config, dh_auto_build, dh_auto_test,
                 build_stderr, build_returncode, test_stdout, test_stderr, test_returncode,
                 test_detected, testing_framework, test_stdout_diff, test_stderr_diff,
-                package_viable_for_test_dataset, rebuild_stderr, rebuild_returncode))
+                package_viable_for_test_dataset, rebuild_stderr, rebuild_returncode, modified_rebuild_stderr, modified_rebuild_returncode))
             conn_local.commit()
 
             for comp_info in compilation_data:
@@ -147,7 +147,9 @@ def main():
         test_stderr_diff TEXT,
         package_viable_for_test_dataset INTEGER,
         rebuild_stderr TEXT,
-        rebuild_returncode INTEGER
+        rebuild_returncode INTEGER,
+        modified_rebuild_stderr TEXT,
+        modified_rebuild_returncode INTEGER
     )
     ''')
 
