@@ -57,4 +57,5 @@ COPY test_framework/debian_package_tester.py \
     ir_processing/ir2o.py \
     ir_processing/nop_injection.py \
     ir_processing/ir_linker.py \
+    ir_processing/fix_linkage.py \
     /worker/

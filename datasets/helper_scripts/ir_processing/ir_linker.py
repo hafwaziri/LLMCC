@@ -1,6 +1,7 @@
 import tempfile
 import subprocess
 import os
+from fix_linkage import restore_private_linkage
 
 def ir_linker(source_ir, modified_function_ir, function_name):
 
@@ -46,6 +47,9 @@ def ir_linker(source_ir, modified_function_ir, function_name):
 
             with open(output_file_path, 'r') as f:
                 merged_ir = f.read()
+
+            merged_ir = restore_private_linkage(source_ir, merged_ir)
+
             return merged_ir
 
     except Exception as e:
