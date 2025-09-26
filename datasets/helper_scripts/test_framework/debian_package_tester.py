@@ -42,14 +42,14 @@ def run_dh_auto_test_command(dh_auto_test_command, package_subdir):
                                     )
     return test_result
 
-def handle_test_rerun_and_diff(test_result, dh_auto_test_command, package_subdir, package_name, test_stdout, test_stderr, test_returncode):
+def handle_test_rerun_and_diff(test_stdout, test_stderr, dh_auto_test_command, package_subdir, package_name, test_returncode):
     test_rerun_result = run_dh_auto_test_command(dh_auto_test_command, package_subdir)
 
     if test_rerun_result.returncode != test_returncode:
         return "", "", 0
 
-    original_stdout_cleaned = clean_test_output(test_result.stdout)
-    original_stderr_cleaned = clean_test_output(test_result.stderr)
+    original_stdout_cleaned = clean_test_output(test_stdout)
+    original_stderr_cleaned = clean_test_output(test_stderr)
     rerun_stdout_cleaned = clean_test_output(test_rerun_result.stdout)
     rerun_stderr_cleaned = clean_test_output(test_rerun_result.stderr)
 
@@ -120,13 +120,12 @@ def test_package(package_name, dh_auto_test_command, package_build_system, packa
         if test_detected != 1:
             return test_stdout, test_stderr, test_returncode, test_detected, framework, "", "", 0
 
-        stdout_diff, stderr_diff, package_viable_for_test_dataset = handle_test_rerun_and_diff(test_result, 
-                                                                                               dh_auto_test_command, 
-                                                                                               package_subdir, 
-                                                                                               package_name, 
-                                                                                               test_stdout, 
-                                                                                               test_stderr, 
-                                                                                               test_returncode)
+        stdout_diff, stderr_diff, package_viable_for_test_dataset = handle_test_rerun_and_diff(test_stdout,
+                                                                                            test_stderr,
+                                                                                            dh_auto_test_command, 
+                                                                                            package_subdir,
+                                                                                            package_name,
+                                                                                            test_returncode)
 
     except Exception as e:
 
