@@ -413,8 +413,8 @@ def process_package(package, package_subdir):
                                             new_mtime = os.path.getmtime(source_file["output_file"])
                                             source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
 
-                                        modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
-                                                                                                        no_preclean=True)
+                            modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
+                                                                                            no_preclean=True)
         else:
             build_system = detect_build_system(dh_auto_config)
 
@@ -503,8 +503,8 @@ def process_package(package, package_subdir):
                                             new_mtime = os.path.getmtime(source_file["output_file"])
                                             source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
 
-                                        modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
-                                                                                                        no_preclean=True)
+                            modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
+                                                                                            no_preclean=True)
 
 
     except Exception as e:
