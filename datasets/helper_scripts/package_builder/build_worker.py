@@ -52,6 +52,9 @@ if __name__ == "__main__":
             3,            # rebuild_returncode
             "",           # modified_rebuild_stderr
             3,            # modified_rebuild_returncode
+            "",           # test_stdout_for_modified_package
+            "",           # test_stderr_for_modified_package
+            0,            # test_passed
             []            # compilation_data
         )
         json.dump(error_result, sys.stdout)

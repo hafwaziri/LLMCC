@@ -4,7 +4,7 @@ import subprocess
 import traceback
 import json
 import time
-from debian_package_tester import test_package
+from debian_package_tester import test_package, handle_test_rerun_and_diff
 from function_extractor import extract_function_from_source, extract_function_from_ir, demangle_symbols
 from random_function_selector import random_function_selector
 from IR_extractor import generate_ir_for_source_file, generate_ir_for_function
@@ -318,6 +318,9 @@ def process_package(package, package_subdir):
     rebuild_returncode = 3
     modified_rebuild_stderr = ""
     modified_rebuild_returncode = 3
+    test_stdout_for_modified_package = ""
+    test_stderr_for_modified_package = ""
+    test_passed = 0
     compilation_data = []
 
     try:
@@ -413,8 +416,27 @@ def process_package(package, package_subdir):
                                             new_mtime = os.path.getmtime(source_file["output_file"])
                                             source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
 
-                            modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
-                                                                                            no_preclean=True)
+                            trigger_relinking = 0
+                            for source_file in compilation_data:
+                                if source_file["modified_object_file_generation_return_code"] == 0 and source_file["modified_object_file_timestamp_check"]:
+                                    trigger_relinking = 1
+                                    break
+                            if trigger_relinking:
+                                modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
+                                                                                                no_preclean=True)
+
+                                dh_auto_test_command = dh_auto_test
+                                if '\trm ' in dh_auto_test_command:
+                                    dh_auto_test_command = dh_auto_test_command.split('\trm ')[0].strip()
+                                if modified_rebuild_returncode == 0 and package_viable_for_test_dataset:
+                                    test_stdout_for_modified_package, test_stderr_for_modified_package, test_passed = handle_test_rerun_and_diff(
+                                        test_stdout,
+                                        test_stderr,
+                                        dh_auto_test_command,
+                                        package_subdir,
+                                        package.name,
+                                        test_returncode
+                                    )
         else:
             build_system = detect_build_system(dh_auto_config)
 
@@ -503,8 +525,27 @@ def process_package(package, package_subdir):
                                             new_mtime = os.path.getmtime(source_file["output_file"])
                                             source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
 
-                            modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
-                                                                                            no_preclean=True)
+                            trigger_relinking = 0
+                            for source_file in compilation_data:
+                                if source_file["modified_object_file_generation_return_code"] == 0 and source_file["modified_object_file_timestamp_check"]:
+                                    trigger_relinking = 1
+                                    break
+                            if trigger_relinking:
+                                modified_rebuild_stderr, modified_rebuild_returncode = build_package(package_subdir,
+                                                                                                no_preclean=True)
+
+                                dh_auto_test_command = dh_auto_test
+                                if '\trm ' in dh_auto_test_command:
+                                    dh_auto_test_command = dh_auto_test_command.split('\trm ')[0].strip()
+                                if modified_rebuild_returncode == 0 and package_viable_for_test_dataset:
+                                    test_stdout_for_modified_package, test_stderr_for_modified_package, test_passed = handle_test_rerun_and_diff(
+                                        test_stdout,
+                                        test_stderr,
+                                        dh_auto_test_command,
+                                        package_subdir,
+                                        package.name,
+                                        test_returncode
+                                    )
 
 
     except Exception as e:
@@ -517,4 +558,5 @@ def process_package(package, package_subdir):
             build_returncode, test_stdout, test_stderr, test_returncode, test_detected,
             testing_framework, stdout_diff, stderr_diff, package_viable_for_test_dataset,
             rebuild_stderr, rebuild_returncode, modified_rebuild_stderr,
-            modified_rebuild_returncode, compilation_data)
+            modified_rebuild_returncode, test_stdout_for_modified_package, test_stderr_for_modified_package,
+            test_passed, compilation_data)
