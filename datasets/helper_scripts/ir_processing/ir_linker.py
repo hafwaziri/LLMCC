@@ -5,6 +5,10 @@ from fix_linkage import restore_private_linkage
 
 def ir_linker(source_ir, modified_function_ir, function_name):
 
+    source_file_path = None
+    func_file_path = None
+    output_file_path = None
+
     try:
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.ll', delete=False) as source_file, \
             tempfile.NamedTemporaryFile(mode='w+', suffix='.ll', delete=False) as func_file, \
@@ -56,7 +60,8 @@ def ir_linker(source_ir, modified_function_ir, function_name):
         return None
     finally:
         for path in [source_file_path, func_file_path, output_file_path]:
-            os.remove(path)
+            if path and os.path.exists(path):
+                os.remove(path)
 
 if __name__ == "__main__":
     pass
