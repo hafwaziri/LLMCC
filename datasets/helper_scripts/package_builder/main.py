@@ -1,10 +1,10 @@
 import sys
 import subprocess
-import json
+import orjson
 import os
 import sqlite3
 import multiprocessing
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import debugpy
 
@@ -37,7 +37,7 @@ def process_package(package_dir, sub_dir, output_dir):
         test_stdout, test_stderr, test_returncode, test_detected, testing_framework,
         test_stdout_diff, test_stderr_diff, package_viable_for_test_dataset,
         rebuild_stderr, rebuild_returncode, modified_rebuild_stderr, modified_rebuild_returncode,
-        test_stdout_for_modified_package, test_stderr_for_modified_package, test_passed ,compilation_data) = json.loads(result.stdout)
+        test_stdout_for_modified_package, test_stderr_for_modified_package, test_passed ,compilation_data) = orjson.loads(result.stdout)
 
 
         package_data = {
@@ -90,13 +90,13 @@ def process_package(package_dir, sub_dir, output_dir):
             }
             package_data["source_files"].append(source_file_data)
 
-            output_file = os.path.join(output_dir, f"{package_name}.json")
-            os.makedirs(output_dir, exist_ok=True)
-            with open(output_file, 'w') as f:
-                json.dump(package_data, f, indent=2, ensure_ascii=False)
+        output_file = os.path.join(output_dir, f"{package_name}.json")
+        os.makedirs(output_dir, exist_ok=True)
+        with open(output_file, 'wb') as f:
+            f.write(orjson.dumps(package_data, option=orjson.OPT_INDENT_2))
 
         return True
-    except json.JSONDecodeError as e:
+    except orjson.JSONDecodeError as e:
         print(f"JSON decode error for {package_name}: {e}")
         print(f"Raw output: {result.stdout!r}")
         return False
@@ -117,14 +117,11 @@ def traverse_dir(root, output_dir):
 
 
     with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
-        futures = []
-        for dir, sub_dir in packages:
-            future = executor.submit(process_package, dir, sub_dir, output_dir)
-            futures.append(future)
+        futures = [executor.submit(process_package, dir, sub_dir, output_dir) for dir, sub_dir in packages]
 
         results = []
         for future in tqdm(
-            futures,
+            as_completed(futures),
             total=len(packages),
             desc="Processing packages"
         ):

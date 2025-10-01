@@ -40,7 +40,8 @@ RUN apt-get update && apt-get install -y \
 # Install Python Packages
 RUN pip install --break-system-packages \
     cxxfilt \
-    llvmlite==0.42.0
+    llvmlite==0.42.0 \
+    orjson
 
 # Install errcheck Go static analysis tool, for the testing framework
 RUN go install github.com/kisielk/errcheck@v1.7.0
