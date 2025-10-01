@@ -1,0 +1,5 @@
+# Testing Framework
+pytest
+
+# For mocking
+pytest-mock
