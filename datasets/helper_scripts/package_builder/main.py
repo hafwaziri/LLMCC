@@ -63,32 +63,31 @@ def process_package(package_dir, sub_dir, output_dir):
             "test_stdout_for_modified_package": test_stdout_for_modified_package,
             "test_stderr_for_modified_package": test_stderr_for_modified_package,
             "test_passed": test_passed,
-            "source_files": []
+            "source_files": [
+                {
+                    "file_path": comp_info['source_file'],
+                    "package_name": package_name,
+                    "compilation_command": ' '.join(comp_info['compiler_flags']),
+                    "output_file": comp_info['output_file'],
+                    "src_functions": comp_info['source_functions'],
+                    "ir_functions": comp_info['ir_functions'],
+                    "random_function": comp_info['random_function'],
+                    "random_function_mangled": comp_info['random_function_mangled'],
+                    "IR_generation_return_code": comp_info['ir_generation_return_code'],
+                    "LLVM_IR": comp_info['llvm_ir'],
+                    "IR_generation_stderr": comp_info['ir_generation_stderr'],
+                    "random_function_IR_generation_return_code": comp_info['random_func_ir_generation_return_code'],
+                    "random_function_IR": comp_info['random_func_llvm_ir'],
+                    "random_function_IR_stderr": comp_info['random_func_ir_generation_stderr'],
+                    "object_file_generation_return_code": comp_info['object_file_generation_return_code'],
+                    "timestamp_check": comp_info['timestamp_check'],
+                    "relinked_llvm_ir": comp_info['relinked_llvm_ir'],
+                    "modified_object_file_generation_return_code": comp_info['modified_object_file_generation_return_code'],
+                    "modified_object_file_timestamp_check": comp_info['modified_object_file_timestamp_check']
+                }
+                for comp_info in compilation_data
+            ]
         }
-
-        for comp_info in compilation_data:
-            source_file_data = {
-                "file_path": comp_info['source_file'],
-                "package_name": package_name,
-                "compilation_command": ' '.join(comp_info['compiler_flags']),
-                "output_file": comp_info['output_file'],
-                "src_functions": comp_info['source_functions'],
-                "ir_functions": comp_info['ir_functions'],
-                "random_function": comp_info['random_function'],
-                "random_function_mangled": comp_info['random_function_mangled'],
-                "IR_generation_return_code": comp_info['ir_generation_return_code'],
-                "LLVM_IR": comp_info['llvm_ir'],
-                "IR_generation_stderr": comp_info['ir_generation_stderr'],
-                "random_function_IR_generation_return_code": comp_info['random_func_ir_generation_return_code'],
-                "random_function_IR": comp_info['random_func_llvm_ir'],
-                "random_function_IR_stderr": comp_info['random_func_ir_generation_stderr'],
-                "object_file_generation_return_code": comp_info['object_file_generation_return_code'],
-                "timestamp_check": comp_info['timestamp_check'],
-                "relinked_llvm_ir": comp_info['relinked_llvm_ir'],
-                "modified_object_file_generation_return_code": comp_info['modified_object_file_generation_return_code'],
-                "modified_object_file_timestamp_check": comp_info['modified_object_file_timestamp_check']
-            }
-            package_data["source_files"].append(source_file_data)
 
         output_file = os.path.join(output_dir, f"{package_name}.json")
         os.makedirs(output_dir, exist_ok=True)
