@@ -130,7 +130,7 @@ def traverse_dir(root, output_dir):
 def main():
 
     if len(sys.argv) < 3:
-        print("Usage: python script.py <root_directory>")
+        print("Usage: python script.py <root_directory> <output_directory>")
         sys.exit(1)
     root_dir = sys.argv[1]
     output_dir = sys.argv[2]
