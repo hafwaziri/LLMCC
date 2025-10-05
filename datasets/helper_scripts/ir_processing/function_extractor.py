@@ -40,7 +40,7 @@ def extract_function_from_source(source_file, compiler_args=None, build_director
             if cursor.location.file and cursor.location.file.name == source_file:
 
                 if cursor.kind in [CursorKind.FUNCTION_DECL, CursorKind.CXX_METHOD,
-                                CursorKind.CONSTRUCTOR, CursorKind.DESTRUCTOR]:
+                                CursorKind.CONSTRUCTOR, CursorKind.DESTRUCTOR] and cursor.is_definition():
 
                     result_type = cursor.type.get_result()
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
 '''
 
-    source_path = '/worker/ocaml-dune-2.9.3/_build/default/src/stdune/fcntl_stubs.c'
+    source_path = './test.cpp'
 
     # functions = extract_function_from_ir(source_ir)
     functions_2 = extract_function_from_source(source_path)
