@@ -47,12 +47,12 @@ def extract_function_from_source(source_file, compiler_args=None, build_director
                     function_info = {
                         "name": cursor.spelling,
                         "return_type": result_type.spelling if result_type else "void",
-                        "arguments": []
+                        "arguments": [arg.type.spelling for arg in cursor.get_arguments()]
                     }
 
-                    for child in cursor.get_children():
-                        if child.kind == CursorKind.PARM_DECL:
-                            function_info["arguments"].append(child.type.spelling)
+                    # for child in cursor.get_children():
+                    #     if child.kind == CursorKind.PARM_DECL:
+                    #         function_info["arguments"].append(child.type.spelling)
 
                     if not function_info["arguments"] and cursor.type.kind == TypeKind.FUNCTIONNOPROTO:
                         function_info["arguments"] = None
