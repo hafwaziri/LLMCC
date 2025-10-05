@@ -36,15 +36,19 @@ def random_function_selector(functions_from_source, functions_from_ir, random_se
                 if '::' in base_name:
                     base_name = base_name.split('::')[-1]
 
-                if base_name in ir_base_to_full:
-                    ir_base_to_full[base_name] = None
+                base_name_lower = base_name.lower()
+
+
+                if base_name_lower in ir_base_to_full:
+                    ir_base_to_full[base_name_lower] = None
                 else:
-                    ir_base_to_full[base_name] = ir_func
+                    ir_base_to_full[base_name_lower] = ir_func
 
             valid_functions = []
             for source_func in functions_from_source:
-                if source_func in ir_base_to_full and ir_base_to_full[source_func] is not None:
-                    valid_functions.append((source_func, ir_base_to_full[source_func]))
+                source_func_lower = source_func.lower()
+                if source_func_lower in ir_base_to_full and ir_base_to_full[source_func_lower] is not None:
+                    valid_functions.append((source_func, ir_base_to_full[source_func_lower]))
 
             if valid_functions:
                 return random.choice(valid_functions)
