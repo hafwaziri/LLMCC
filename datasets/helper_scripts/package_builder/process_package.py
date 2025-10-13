@@ -90,38 +90,6 @@ def detect_build_system(output_txt):
         return "make"
     return "unknown"
 
-#TODO: Move this to the Dockerfile
-def update_apt_sources():
-    """
-    Updates the APT sources list with Debian bookworm repositories and refreshes the package lists.
-    Returns True if successful, False otherwise.
-    """
-    sources_content = """deb https://deb.debian.org/debian bookworm main non-free-firmware
-deb-src https://deb.debian.org/debian bookworm main non-free-firmware
-
-deb https://security.debian.org/debian-security bookworm-security main non-free-firmware
-deb-src https://security.debian.org/debian-security bookworm-security main non-free-firmware
-
-deb https://deb.debian.org/debian bookworm-updates main non-free-firmware
-deb-src https://deb.debian.org/debian bookworm-updates main non-free-firmware"""
-
-    try:
-        with open('/tmp/custom_sources.list', 'w') as f:
-            f.write(sources_content)
-
-        subprocess.run(["sudo", "cp", "/tmp/custom_sources.list", "/etc/apt/sources.list"],
-                    check=True,
-                    timeout=COMMAND_TIMEOUT)
-
-        subprocess.run(["sudo", "apt-get", "update"],
-                    check=True,
-                    timeout=COMMAND_TIMEOUT,
-                    capture_output=True)
-        return True
-    except Exception as e:
-        print(f"Failed to update sources: {e}", file=sys.stderr)
-        return False
-
 def extract_compilation_commands(package_subdir):
 
     compile_commands_path = os.path.join(package_subdir, "compile_commands.json")
@@ -330,9 +298,12 @@ def process_package(package, package_subdir):
             dh_auto_build = run_dh_command("dh_auto_build", package_subdir)
             build_system = detect_build_system(dh_auto_build)
 
-            update_apt_sources()
-
             try:
+                subprocess.run(["sudo", "apt-get", "update"],
+                            shell=False,
+                            capture_output=True,
+                            check=False)
+
                 subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"],
                             cwd=package_subdir.path,
                             shell=False,
@@ -440,9 +411,12 @@ def process_package(package, package_subdir):
         else:
             build_system = detect_build_system(dh_auto_config)
 
-            update_apt_sources()
-
             try:
+                subprocess.run(["sudo", "apt-get", "update"],
+                            shell=False,
+                            capture_output=True,
+                            check=False)
+
                 subprocess.run(["sudo", "apt-get", "build-dep", package.name, "-y"],
                             cwd=package_subdir.path,
                             shell=False,
