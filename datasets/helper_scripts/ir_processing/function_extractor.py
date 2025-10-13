@@ -86,19 +86,17 @@ def extract_function_from_ir(ir_code):
             if func.is_declaration:
                 continue
 
-            func_type = func.type
-
-
-            if func_type.is_pointer:
-                func_type = func_type.element_type
-
+            func_type = func.global_value_type
 
             type_elements = list(func_type.elements)
 
+            return_type = str(type_elements[0]) if type_elements else "void"
+            arguments = [str(arg_type) for arg_type in type_elements[1:]] if len(type_elements) > 1 else []
+
             function_info = {
                 "name": func.name,
-                "return_type": str(type_elements[0]) if type_elements else "void",
-                "arguments": [str(arg_type) for arg_type in type_elements[1:]] if len(type_elements) > 1 else []
+                "return_type": return_type,
+                "arguments": arguments
             }
 
             functions.append(function_info)
