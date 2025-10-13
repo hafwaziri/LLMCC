@@ -3,7 +3,6 @@ from llvmlite import binding as llvm
 
 def restore_private_linkage(original_ir, modified_ir):
     try:
-        llvm.initialize()
         llvm.initialize_native_target()
         llvm.initialize_native_asmprinter()
 
