@@ -26,7 +26,7 @@ download_source() {
     local mirror="deb.debian.org/debian"
     local architecture="source"
     local section="main,contrib,non-free"
-    local release="stable"
+    local release="trixie"
 
     debmirror \
         --progress \

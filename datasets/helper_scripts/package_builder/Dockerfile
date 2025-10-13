@@ -1,14 +1,10 @@
-FROM debian:bookworm-slim
-
-# RUN echo "deb https://deb.debian.org/debian bookworm main non-free-firmware" > /etc/apt/sources.list && \
-#     echo "deb-src https://deb.debian.org/debian bookworm main non-free-firmware" >> /etc/apt/sources.list && \
-#     echo "deb https://security.debian.org/debian-security bookworm-security main non-free-firmware" >> /etc/apt/sources.list && \
-#     echo "deb-src https://security.debian.org/debian-security bookworm-security main non-free-firmware" >> /etc/apt/sources.list && \
-#     echo "deb https://deb.debian.org/debian bookworm-updates main non-free-firmware" >> /etc/apt/sources.list.d/debian-bookworm.list && \
-#     echo "deb-src https://deb.debian.org/debian bookworm-updates main non-free-firmware" >> /etc/apt/sources.list.d/debian-bookworm.list
+FROM debian:trixie-slim
 
 #Required to get Python2
 RUN echo "deb http://archive.debian.org/debian/ stretch contrib main non-free" > /etc/apt/sources.list
+
+# Required for build-dep
+RUN echo "deb-src http://deb.debian.org/debian trixie main contrib non-free non-free-firmware" >> /etc/apt/sources.list
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -40,7 +36,7 @@ RUN apt-get update && apt-get install -y \
 # Install Python Packages
 RUN pip install --break-system-packages \
     cxxfilt \
-    llvmlite==0.42.0 \
+    llvmlite\
     orjson
 
 # Install errcheck Go static analysis tool, for the testing framework
