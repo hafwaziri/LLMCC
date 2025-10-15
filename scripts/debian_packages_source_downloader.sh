@@ -1,5 +1,18 @@
 #!/bin/bash
 
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <destination_directory>"
+    echo "  destination_directory: Directory to download Debian source packages to"
+    exit 1
+fi
+
+DEST_DIR="$1"
+
+if [ ! -d "$DEST_DIR" ]; then
+    echo "Creating destination directory: $DEST_DIR"
+    mkdir -p "$DEST_DIR"
+fi
+
 check_install_package() {
     local package_name="$1"
 
@@ -21,12 +34,12 @@ check_install_package() {
 }
 
 download_source() {
-
-    local dest_dir="../debian-source"
     local mirror="deb.debian.org/debian"
     local architecture="source"
     local section="main,contrib,non-free"
     local release="trixie"
+
+    echo "Downloading Debian source packages to: $DEST_DIR"
 
     debmirror \
         --progress \
@@ -40,7 +53,7 @@ download_source() {
         --no-check-gpg \
         --ignore-release-gpg \
         --source \
-        "$dest_dir"
+        "$DEST_DIR"
 
     echo "-------------------------------------"
     echo "Download complete!"
