@@ -44,15 +44,15 @@ RUN go install github.com/kisielk/errcheck@v1.7.0
 
 WORKDIR /worker
 
-COPY test_framework/debian_package_tester.py \
-    package_builder/build_worker.py \
-    package_builder/process_package.py \
-    test_framework/test_output_parser.py \
-    ir_processing/function_extractor.py \
-    ir_processing/random_function_selector.py \
-    ir_processing/IR_extractor.py \
-    ir_processing/ir2o.py \
-    ir_processing/nop_injection.py \
-    ir_processing/ir_linker.py \
-    ir_processing/fix_linkage.py \
+COPY /datasets/helper_scripts/test_framework/debian_package_tester.py \
+    /datasets/helper_scripts/package_builder/build_worker.py \
+    /datasets/helper_scripts/package_builder/process_package.py \
+    /datasets/helper_scripts/test_framework/test_output_parser.py \
+    /datasets/helper_scripts/ir_processing/function_extractor.py \
+    /datasets/helper_scripts/ir_processing/random_function_selector.py \
+    /datasets/helper_scripts/ir_processing/IR_extractor.py \
+    /datasets/helper_scripts/ir_processing/nop_injection.py \
+    /datasets/helper_scripts/ir_processing/ir2o.py \
+    /datasets/helper_scripts/ir_processing/ir_linker.py \
+    /datasets/helper_scripts/ir_processing/fix_linkage.py \
     /worker/
