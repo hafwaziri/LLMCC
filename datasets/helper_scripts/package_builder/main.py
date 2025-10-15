@@ -1,14 +1,45 @@
 import sys
 import subprocess
-import orjson
 import os
-import sqlite3
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import orjson
 from tqdm import tqdm
 import debugpy
 
-def process_package(package_dir, sub_dir, output_dir):
+def load_checkpoint(output_dir):
+    checkpoint_file = os.path.join(output_dir, ".checkpoint.txt")
+
+    if os.path.exists(checkpoint_file):
+        try:
+            with open(checkpoint_file, 'r') as f:
+                return set(line.strip() for line in f if line.strip())
+        except Exception as e:
+            print(f"Error loading checkpoint: {e}")
+            return set()
+    return set()
+
+def append_to_checkpoint(output_dir, package_name):
+    checkpoint_file = os.path.join(output_dir, ".checkpoint.txt")
+    try:
+        with open(checkpoint_file, 'a') as f:
+            f.write(f"{package_name}\n")
+    except Exception as e:
+        print(f"Error appending to checkpoint: {e}")
+
+def is_package_completed(package_name, output_dir):
+    output_file = os.path.join(output_dir, f"{package_name}.json")
+    if not os.path.exists(output_file):
+        return False
+
+    try:
+        with open(output_file, 'rb') as f:
+            data = orjson.loads(f.read())
+            return "name" in data and "source_files" in data
+    except:
+        return False
+
+def process_package(package_dir, sub_dir, output_dir, processed_packages):
 
     # debugpy.breakpoint()
 
@@ -17,6 +48,10 @@ def process_package(package_dir, sub_dir, output_dir):
 
     package_name = os.path.basename(package_path)
     sub_dir_name = os.path.basename(sub_dir_path)
+
+    if package_name in processed_packages or is_package_completed(package_name, output_dir):
+        print(f"Skipping already processed package: {package_name}")
+        return True, package_name
 
     docker_cmd = [
         "docker", "run", "--rm",
@@ -94,16 +129,19 @@ def process_package(package_dir, sub_dir, output_dir):
         with open(output_file, 'wb') as f:
             f.write(orjson.dumps(package_data, option=orjson.OPT_INDENT_2))
 
-        return True
+        return True, package_name
     except orjson.JSONDecodeError as e:
         print(f"JSON decode error for {package_name}: {e}")
         print(f"Raw output: {result.stdout!r}")
-        return False
+        return False, package_name
     except Exception as e:
         print(f"Exception in package: {package_name}: {e}")
-        return False
+        return False, package_name
 
 def traverse_dir(root, output_dir):
+
+    processed_packages = load_checkpoint(output_dir)
+    print(f"Loaded {len(processed_packages)} processed packages from checkpoint.")
 
     packages = []
     dirs = [d for d in os.scandir(root) if d.is_dir()]
@@ -111,12 +149,19 @@ def traverse_dir(root, output_dir):
     for dir in dirs:
         for sub_dir in os.scandir(dir.path):
             if sub_dir.is_dir():
-                packages.append((dir, sub_dir))
+                package_name = os.path.basename(dir.path)
+                if package_name not in processed_packages and not is_package_completed(package_name, output_dir):
+                    packages.append((dir, sub_dir))
                 break
 
+    print(f"Found {len(packages)} packages to process.")
+
+    if not packages:
+        print("No packages to process. Exiting.")
+        return
 
     with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
-        futures = [executor.submit(process_package, dir, sub_dir, output_dir) for dir, sub_dir in packages]
+        futures = [executor.submit(process_package, dir, sub_dir, output_dir, processed_packages) for dir, sub_dir in packages]
 
         results = []
         for future in tqdm(
@@ -124,8 +169,12 @@ def traverse_dir(root, output_dir):
             total=len(packages),
             desc="Processing packages"
         ):
-            results.append(future.result())
+            success, package_name = future.result()
+            results.append(success)
 
+            if success:
+                processed_packages.add(package_name)
+                append_to_checkpoint(output_dir, package_name)
 
 def main():
 
@@ -134,6 +183,13 @@ def main():
         sys.exit(1)
     root_dir = sys.argv[1]
     output_dir = sys.argv[2]
+    force_reprocess = "--force-reprocess" in sys.argv
+
+    if force_reprocess:
+        checkpoint_file = os.path.join(output_dir, ".checkpoint.txt")
+        if os.path.exists(checkpoint_file):
+            os.remove(checkpoint_file)
+        print("Force reprocess enabled. Checkpoint cleared.")
 
     traverse_dir(root_dir, output_dir)
 
