@@ -1,5 +1,18 @@
 #!/bin/bash
 
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <debian_source_directory>"
+    echo "  debian_source_directory: Directory containing downloaded Debian source packages"
+    exit 1
+fi
+
+DEBIAN_SOURCE_DIR="$1"
+
+if [[ ! -d "$DEBIAN_SOURCE_DIR" ]]; then
+    echo "Error: Debian source directory '$DEBIAN_SOURCE_DIR' does not exist"
+    exit 1
+fi
+
 process_package() {
     local pkg_dir="$1"
     echo "Processing package: ${pkg_dir}"
@@ -18,7 +31,7 @@ process_package() {
     cd ..
 }
 
-cd ../debian-source
+cd "$DEBIAN_SOURCE_DIR"
 
 rm -rf dists project
 
@@ -40,6 +53,5 @@ echo "Deleted packages that are emptied after deleting redundant files"
 export -f process_package
 
 find . -maxdepth 1 -type d -not -path "." | sort | parallel -j $(nproc) process_package
-
 
 echo "All packages processed."
