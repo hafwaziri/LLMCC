@@ -57,7 +57,6 @@ def process_package(package_dir, sub_dir, output_dir, processed_packages):
         "docker", "run", "--rm",
         "-v", f"{package_path}:/worker/{package_name}",
         "-v", f"{sub_dir_path}:/worker/{sub_dir_name}",
-        "-v", "../test_framework/tests/output_diff/:/worker/package_tester_output_diff/",
         # "-p", "5678:5678",
         "-w", "/worker",
         "debian-builder",
