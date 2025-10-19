@@ -6,3 +6,4 @@ testing/
 debian_source_test.db
 __pycache__/
 datasets/debian_source_test.db
+*.sif
