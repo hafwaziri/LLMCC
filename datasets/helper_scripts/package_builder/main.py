@@ -137,7 +137,7 @@ def process_package(package_dir, sub_dir, output_dir, processed_packages):
         print(f"Exception in package: {package_name}: {e}")
         return False, package_name
 
-def traverse_dir(root, output_dir):
+def traverse_dir(root, output_dir, batch_size=None):
 
     processed_packages = load_checkpoint(output_dir)
     print(f"Loaded {len(processed_packages)} processed packages from checkpoint.")
@@ -153,7 +153,11 @@ def traverse_dir(root, output_dir):
                     packages.append((dir, sub_dir))
                 break
 
-    print(f"Found {len(packages)} packages to process.")
+    if batch_size is not None:
+        packages = packages[:batch_size]
+        print(f"Batch size limit: {batch_size}. Processing {len(packages)} packages.")
+    else:
+        print(f"Found {len(packages)} packages to process.")
 
     if not packages:
         print("No packages to process. Exiting.")
@@ -178,11 +182,16 @@ def traverse_dir(root, output_dir):
 def main():
 
     if len(sys.argv) < 3:
-        print("Usage: python script.py <root_directory> <output_directory>")
+        print("Usage: python script.py <root_directory> <output_directory> [--batch-size N] [--force-reprocess]")
         sys.exit(1)
     root_dir = sys.argv[1]
     output_dir = sys.argv[2]
     force_reprocess = "--force-reprocess" in sys.argv
+
+    batch_size = None
+    if "--batch-size" in sys.argv:
+        batch_index = sys.argv.index("--batch-size") + 1
+        batch_size = int(sys.argv[batch_index])
 
     if force_reprocess:
         checkpoint_file = os.path.join(output_dir, ".checkpoint.txt")
@@ -190,7 +199,7 @@ def main():
             os.remove(checkpoint_file)
         print("Force reprocess enabled. Checkpoint cleared.")
 
-    traverse_dir(root_dir, output_dir)
+    traverse_dir(root_dir, output_dir, batch_size)
 
 if __name__ == "__main__":
     # debugpy.listen(("0.0.0.0", 5690))
