@@ -60,6 +60,9 @@ if __name__ == "__main__":
             continue
 
         cleaned_LLVM_IR = preprocess_llvm_ir(llvm_IR.stdout)
+        if not cleaned_LLVM_IR:
+            print(f"IR preprocessing failed for {data_point}")
+            continue
 
         preprocessed_executable_path = os.path.join(preprocessed_output_dir, os.path.basename(data_point).replace('.c', ''))
         ir_compilation_command = ["/usr/bin/clang", "-O0", "-o", preprocessed_executable_path, "placeholder.ll"]
