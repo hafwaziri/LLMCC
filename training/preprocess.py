@@ -1,5 +1,6 @@
 import tempfile
 import subprocess
+import re
 
 def preprocess_llvm_ir(llvm_ir):
 
@@ -16,5 +17,10 @@ def preprocess_llvm_ir(llvm_ir):
 
     with open(temp_ir.name, 'r') as f:
         llvm_ir = f.read()
+    
+    llvm_ir = re.sub(r'^; ModuleID = .*$\n?', '', llvm_ir, flags=re.MULTILINE)
+    llvm_ir = re.sub(r'^source_filename = .*$\n?', '', llvm_ir, flags=re.MULTILINE)
+    llvm_ir = re.sub(r'^target datalayout = .*$\n?', '', llvm_ir, flags=re.MULTILINE)
+    llvm_ir = re.sub(r'^target triple = .*$\n?', '', llvm_ir, flags=re.MULTILINE)
 
     return llvm_ir
