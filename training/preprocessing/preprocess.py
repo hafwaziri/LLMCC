@@ -1,6 +1,7 @@
 import tempfile
 import subprocess
 import re
+import os
 
 def preprocess_llvm_ir(llvm_ir):
 
@@ -13,11 +14,14 @@ def preprocess_llvm_ir(llvm_ir):
     debug_stripped = subprocess.run(opt_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     if debug_stripped.returncode != 0:
+        os.unlink(temp_ir_path)
         return False
 
-    with open(temp_ir.name, 'r') as f:
+    with open(temp_ir_path, 'r') as f:
         llvm_ir = f.read()
-    
+
+    os.unlink(temp_ir_path)
+
     llvm_ir = re.sub(r'^; ModuleID = .*$\n?', '', llvm_ir, flags=re.MULTILINE)
     llvm_ir = re.sub(r'^source_filename = .*$\n?', '', llvm_ir, flags=re.MULTILINE)
     llvm_ir = re.sub(r'^target datalayout = .*$\n?', '', llvm_ir, flags=re.MULTILINE)

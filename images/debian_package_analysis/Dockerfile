@@ -37,7 +37,8 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --break-system-packages \
     cxxfilt \
     llvmlite\
-    orjson
+    orjson \
+    pyarrow
 
 # Install errcheck Go static analysis tool, for the testing framework
 RUN go install github.com/kisielk/errcheck@v1.7.0
@@ -55,4 +56,6 @@ COPY /datasets/helper_scripts/test_framework/debian_package_tester.py \
     /datasets/helper_scripts/ir_processing/ir2o.py \
     /datasets/helper_scripts/ir_processing/ir_linker.py \
     /datasets/helper_scripts/ir_processing/fix_linkage.py \
+    /training/preprocess.py \
+    /training/debian_packages_sources.py \
     /worker/
