@@ -39,7 +39,7 @@ def is_package_completed(package_name, output_dir):
     except:
         return False
 
-def process_package(package_dir, sub_dir, output_dir, processed_packages):
+def process_package(package_dir, sub_dir, output_dir, processed_packages, cpu_set):
 
     # debugpy.breakpoint()
 
@@ -55,6 +55,7 @@ def process_package(package_dir, sub_dir, output_dir, processed_packages):
 
     docker_cmd = [
         "docker", "run", "--rm",
+        "--cpuset-cpus", cpu_set,
         "-v", f"{package_path}:/worker/{package_name}",
         "-v", f"{sub_dir_path}:/worker/{sub_dir_name}",
         # "-p", "5678:5678",
@@ -64,7 +65,18 @@ def process_package(package_dir, sub_dir, output_dir, processed_packages):
     ]
 
     print(f"Processing Package: {package_name}")
-    result = subprocess.run(docker_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    try:
+        result = subprocess.run(
+            docker_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=3600
+        )
+    except subprocess.TimeoutExpired:
+        print(f"Package {package_name} timed out after 3600 seconds")
+        return False, package_name
 
     try:
         (build_system, dh_auto_config, dh_auto_build, dh_auto_test, build_stderr, build_returncode,
@@ -163,8 +175,37 @@ def traverse_dir(root, output_dir, batch_size=None):
         print("No packages to process. Exiting.")
         return
 
-    with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
-        futures = [executor.submit(process_package, dir, sub_dir, output_dir, processed_packages) for dir, sub_dir in packages]
+    # Dynamically generate CPU assignments
+    total_cpus = multiprocessing.cpu_count()
+    reserved_cpus = 4
+    cores_per_worker = 2
+    available_cpus = total_cpus - reserved_cpus
+    max_workers = available_cpus // cores_per_worker
+
+    cpu_assignments = [
+        f"{i},{i+1}"
+        for i in range(0, max_workers * cores_per_worker, cores_per_worker)
+    ]
+
+    print(f"Total CPUs: {total_cpus}")
+    print(f"Reserved: {reserved_cpus}")
+    print(f"Using {max_workers} workers with {cores_per_worker} cores each.")
+    print(f"CPU Assignments: {cpu_assignments}")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+
+        futures = []
+        for i, (dir, sub_dir) in enumerate(packages):
+            cpu_set = cpu_assignments[i % len(cpu_assignments)]
+            future = executor.submit(
+                process_package,
+                dir,
+                sub_dir,
+                output_dir,
+                processed_packages,
+                cpu_set
+            )
+            futures.append(future)
 
         results = []
         for future in tqdm(
