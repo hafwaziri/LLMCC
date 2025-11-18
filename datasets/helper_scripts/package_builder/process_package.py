@@ -4,6 +4,8 @@ import subprocess
 import traceback
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 from debian_package_tester import test_package, handle_test_rerun_and_diff
 from function_extractor import extract_function_from_source, extract_function_from_ir, demangle_symbols
 from random_function_selector import random_function_selector
@@ -13,7 +15,6 @@ from ir2o import ir_to_o
 from nop_injection import ir_injection
 from ir_linker import ir_linker
 import debugpy
-
 
 #TODO: Remove Magic Numbers
 
@@ -115,134 +116,192 @@ def extract_compilation_commands(package_subdir):
 
     return compilation_data
 
+def process_single_source_file(source_file):
+    source_file["source_functions"] = None
+    source_file["ir_functions"] = None
+    source_file["random_function"] = None
+    source_file["random_function_mangled"] = None
+    source_file["ir_generation_return_code"] = 3
+    source_file["llvm_ir"] = None
+    source_file["ir_generation_stderr"] = None
+    source_file["random_func_ir_generation_return_code"] = 3
+    source_file["random_func_llvm_ir"] = None
+    source_file["random_func_ir_generation_stderr"] = None
+    source_file["object_file_generation_return_code"] = 3
+    source_file["timestamp_check"] = 0
+    source_file["relinked_llvm_ir"] = None
+    source_file["modified_object_file_generation_return_code"] = 3
+    source_file["modified_object_file_timestamp_check"] = 0
+
+    if (not os.path.exists(source_file["source_file"])
+        or not os.path.exists(source_file["directory"])
+        or source_file["source_file"].split('/')[-1] in
+        ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
+        "CMakeCXXCompilerABI.cpp"]
+        or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
+                                                    "testing", "unittest",
+                                                    "ctest", "check",
+                                                    "test-suite", "testsuite",
+                                                    "regression"]
+        or "test" in source_file["source_file"].split('/')[-1].lower()
+        or "testing" in source_file["source_file"].split('/')[-1].lower()):
+        return source_file
+
+    all_clang_flags = source_file["compiler_flags"][1:]
+    clang_flags = [flag for flag in all_clang_flags
+                if flag.startswith(("-I", "-D", "-std="))]
+
+    source_file_functions = extract_function_from_source(source_file["source_file"],
+                                                        clang_flags,
+                                                        source_file["directory"])
+    if source_file_functions:
+        source_file["source_functions"] = source_file_functions
+
+    if source_file["compiler_flags"]:
+        compilation_command = generate_ir_output_command(
+            source_file["compiler_flags"])
+        if not compilation_command:
+            return source_file
+
+        source_ir = generate_ir_for_source_file(source_file["directory"],
+                                            compilation_command)
+        if source_ir:
+            source_file["ir_generation_return_code"] = source_ir.returncode
+            source_file["llvm_ir"] = source_ir.stdout
+            source_file["ir_generation_stderr"] = source_ir.stderr
+
+            demangled_to_mangled = {}
+            ir_file_functions = extract_function_from_ir(source_ir.stdout)
+            if ir_file_functions:
+                demangled_functions = demangle_symbols(ir_file_functions)
+
+                ir_function_names = [func['name'] for func in ir_file_functions]
+                demangled_function_names = [func['name'] for func in demangled_functions]
+
+                for original, demangled in zip(ir_function_names, demangled_function_names):
+                    demangled_to_mangled[demangled] = original
+
+
+                source_file["ir_functions"] = demangled_functions
+
+            source_function_names = [func['name'] for func in source_file["source_functions"]] if source_file["source_functions"] else None
+            ir_function_names = [func['name'] for func in source_file["ir_functions"]] if source_file["ir_functions"] else None
+
+            source_function_name, ir_function_name = random_function_selector(
+                source_function_names,
+                ir_function_names
+                )
+
+            if source_function_name and ir_function_name:
+                random_function_dict = None
+                if source_file["source_functions"]:
+                    for func in source_file["source_functions"]:
+                        if func['name'] == source_function_name:
+                            random_function_dict = func
+                            break
+                source_file["random_function"] = random_function_dict
+
+                mangled_function_name = demangled_to_mangled.get(ir_function_name,
+                                                                ir_function_name)
+                source_file["random_function_mangled"] = mangled_function_name
+
+            if (source_ir.returncode == 0
+                and source_ir.stdout and source_file["random_function"]):
+                mangled_function_name = demangled_to_mangled.get(ir_function_name,
+                                                                ir_function_name)
+                function_ir = generate_ir_for_function(source_ir.stdout,
+                                                    mangled_function_name)
+                if function_ir:
+                    source_file["random_func_ir_generation_return_code"] = (
+                        function_ir.returncode)
+                    source_file["random_func_llvm_ir"] = function_ir.stdout
+                    source_file["random_func_ir_generation_stderr"] = function_ir.stderr
+
+            if (source_ir.returncode == 0
+                and source_ir.stdout
+                and source_file["output_file"]
+                and os.path.exists(source_file["output_file"])):
+
+                original_mtime = os.path.getmtime(source_file["output_file"])
+
+                compilation_command_for_o = source_file["compiler_flags"].copy()
+                compilation_command_for_o[0] = "clang"
+
+                time.sleep(0.1) #Ensure timestamp difference
+
+                object_file_generation_result = ir_to_o(
+                    source_ir.stdout,
+                    compilation_command_for_o,
+                    source_file["output_file"],
+                    source_file["directory"]
+                )
+
+                source_file["object_file_generation_return_code"] = (
+                    object_file_generation_result.returncode
+                )
+
+                if os.path.exists(source_file["output_file"]):
+                    new_mtime = os.path.getmtime(source_file["output_file"])
+                    source_file["timestamp_check"] = new_mtime > original_mtime
+    return source_file
+
+def process_modified_source_file(source_file):
+    if source_file['random_func_llvm_ir']:
+        injected_ir = ir_injection(
+            source_file['random_func_llvm_ir'],
+            injection_code='%nop_temp = add i32 0, 0')
+        source_file['random_func_llvm_ir'] = injected_ir
+    if source_file['llvm_ir']:
+        relinked_ir = ir_linker(
+            source_file['llvm_ir'],
+            source_file['random_func_llvm_ir'],
+            source_file['random_function_mangled']
+        )
+        source_file['relinked_llvm_ir'] = relinked_ir
+
+        # TODO: Analyze and Validate modified IR before compilation
+
+        if (relinked_ir
+            and source_file["output_file"]
+            and os.path.exists(source_file["output_file"])):
+
+            original_mtime = os.path.getmtime(source_file["output_file"])
+
+            compilation_command_for_o = source_file["compiler_flags"].copy()
+            compilation_command_for_o[0] = "clang"
+
+            time.sleep(0.1)
+
+            object_file_generation_result = ir_to_o(
+                relinked_ir,
+                compilation_command_for_o,
+                source_file["output_file"],
+                source_file["directory"]
+            )
+
+            source_file["modified_object_file_generation_return_code"] = (
+                object_file_generation_result.returncode
+            )
+
+            if os.path.exists(source_file["output_file"]):
+                new_mtime = os.path.getmtime(source_file["output_file"])
+                source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
+    return source_file
+
 def ir_processing_for_package(compilation_data):
-    for source_file in compilation_data:
-        source_file["source_functions"] = None
-        source_file["ir_functions"] = None
-        source_file["random_function"] = None
-        source_file["random_function_mangled"] = None
-        source_file["ir_generation_return_code"] = 3
-        source_file["llvm_ir"] = None
-        source_file["ir_generation_stderr"] = None
-        source_file["random_func_ir_generation_return_code"] = 3
-        source_file["random_func_llvm_ir"] = None
-        source_file["random_func_ir_generation_stderr"] = None
-        source_file["object_file_generation_return_code"] = 3
-        source_file["timestamp_check"] = 0
-        source_file["relinked_llvm_ir"] = None
-        source_file["modified_object_file_generation_return_code"] = 3
-        source_file["modified_object_file_timestamp_check"] = 0
+    with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+        futures = {executor.submit(process_single_source_file, source_file): i
+                for i, source_file in enumerate(compilation_data)}
 
-        if (not os.path.exists(source_file["source_file"])
-            or not os.path.exists(source_file["directory"])
-            or source_file["source_file"].split('/')[-1] in
-            ["CMakeCCompilerId.c", "CMakeCXXCompilerId.cpp", "CMakeCCompilerABI.c",
-            "CMakeCXXCompilerABI.cpp"]
-            or source_file["directory"].split('/')[-1] in ["tests", "test", "t",
-                                                        "testing", "unittest",
-                                                        "ctest", "check",
-                                                        "test-suite", "testsuite",
-                                                        "regression"]
-            or "test" in source_file["source_file"].split('/')[-1].lower()
-            or "testing" in source_file["source_file"].split('/')[-1].lower()):
-            continue
+        results = [None] * len(compilation_data)
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                results[idx] = compilation_data[idx]
 
-        all_clang_flags = source_file["compiler_flags"][1:]
-        clang_flags = [flag for flag in all_clang_flags
-                    if flag.startswith(("-I", "-D", "-std="))]
-
-        source_file_functions = extract_function_from_source(source_file["source_file"],
-                                                            clang_flags,
-                                                            source_file["directory"])
-        if source_file_functions:
-            source_file["source_functions"] = source_file_functions
-
-        if source_file["compiler_flags"]:
-            compilation_command = generate_ir_output_command(
-                source_file["compiler_flags"])
-            if not compilation_command:
-                continue
-
-            source_ir = generate_ir_for_source_file(source_file["directory"],
-                                                compilation_command)
-            if source_ir:
-                source_file["ir_generation_return_code"] = source_ir.returncode
-                source_file["llvm_ir"] = source_ir.stdout
-                source_file["ir_generation_stderr"] = source_ir.stderr
-
-                demangled_to_mangled = {}
-                ir_file_functions = extract_function_from_ir(source_ir.stdout)
-                if ir_file_functions:
-                    demangled_functions = demangle_symbols(ir_file_functions)
-
-                    ir_function_names = [func['name'] for func in ir_file_functions]
-                    demangled_function_names = [func['name'] for func in demangled_functions]
-
-                    for original, demangled in zip(ir_function_names, demangled_function_names):
-                        demangled_to_mangled[demangled] = original
-
-
-                    source_file["ir_functions"] = demangled_functions
-
-                source_function_names = [func['name'] for func in source_file["source_functions"]] if source_file["source_functions"] else None
-                ir_function_names = [func['name'] for func in source_file["ir_functions"]] if source_file["ir_functions"] else None
-
-                source_function_name, ir_function_name = random_function_selector(
-                    source_function_names,
-                    ir_function_names
-                    )
-
-                if source_function_name and ir_function_name:
-                    random_function_dict = None
-                    if source_file["source_functions"]:
-                        for func in source_file["source_functions"]:
-                            if func['name'] == source_function_name:
-                                random_function_dict = func
-                                break
-                    source_file["random_function"] = random_function_dict
-
-                    mangled_function_name = demangled_to_mangled.get(ir_function_name,
-                                                                    ir_function_name)
-                    source_file["random_function_mangled"] = mangled_function_name
-
-                if (source_ir.returncode == 0
-                    and source_ir.stdout and source_file["random_function"]):
-                    mangled_function_name = demangled_to_mangled.get(ir_function_name,
-                                                                    ir_function_name)
-                    function_ir = generate_ir_for_function(source_ir.stdout,
-                                                        mangled_function_name)
-                    if function_ir:
-                        source_file["random_func_ir_generation_return_code"] = (
-                            function_ir.returncode)
-                        source_file["random_func_llvm_ir"] = function_ir.stdout
-                        source_file["random_func_ir_generation_stderr"] = function_ir.stderr
-
-                if (source_ir.returncode == 0
-                    and source_ir.stdout
-                    and source_file["output_file"]
-                    and os.path.exists(source_file["output_file"])):
-
-                    original_mtime = os.path.getmtime(source_file["output_file"])
-
-                    compilation_command_for_o = source_file["compiler_flags"].copy()
-                    compilation_command_for_o[0] = "clang"
-
-                    time.sleep(0.1) #Ensure timestamp difference
-
-                    object_file_generation_result = ir_to_o(
-                        source_ir.stdout,
-                        compilation_command_for_o,
-                        source_file["output_file"],
-                        source_file["directory"]
-                    )
-
-                    source_file["object_file_generation_return_code"] = (
-                        object_file_generation_result.returncode
-                    )
-
-                    if os.path.exists(source_file["output_file"]):
-                        new_mtime = os.path.getmtime(source_file["output_file"])
-                        source_file["timestamp_check"] = new_mtime > original_mtime
+        return results
 
 
     return compilation_data
@@ -266,7 +325,6 @@ def override_dh_dwz(package_subdir):
     except Exception as e:
         print(f"Failed to override dh_dwz: {e}")
         return False
-
 
 def process_package(package, package_subdir):
     build_system = "unknown"
@@ -345,47 +403,19 @@ def process_package(package, package_subdir):
                                                                     no_preclean=True)
 
                         if rebuild_returncode == 0:
-                            for source_file in compilation_data:
-                                if source_file['random_func_llvm_ir']:
-                                    injected_ir = ir_injection(
-                                        source_file['random_func_llvm_ir'],
-                                        injection_code='%nop_temp = add i32 0, 0')
-                                    source_file['random_func_llvm_ir'] = injected_ir
-                                if source_file['llvm_ir']:
-                                    relinked_ir = ir_linker(
-                                        source_file['llvm_ir'],
-                                        source_file['random_func_llvm_ir'],
-                                        source_file['random_function_mangled']
-                                    )
-                                    source_file['relinked_llvm_ir'] = relinked_ir
+                            with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+                                futures = {executor.submit(process_modified_source_file, source_file): i
+                                        for i, source_file in enumerate(compilation_data)}
 
-                                    # TODO: Analyze and Validate modified IR before compilation
+                                results = [None] * len(compilation_data)
+                                for future in as_completed(futures):
+                                    idx = futures[future]
+                                    try:
+                                        results[idx] = future.result()
+                                    except Exception as e:
+                                        results[idx] = compilation_data[idx]
 
-                                    if (relinked_ir
-                                        and source_file["output_file"]
-                                        and os.path.exists(source_file["output_file"])):
-
-                                        original_mtime = os.path.getmtime(source_file["output_file"])
-
-                                        compilation_command_for_o = source_file["compiler_flags"].copy()
-                                        compilation_command_for_o[0] = "clang"
-
-                                        time.sleep(0.1)
-
-                                        object_file_generation_result = ir_to_o(
-                                            relinked_ir,
-                                            compilation_command_for_o,
-                                            source_file["output_file"],
-                                            source_file["directory"]
-                                        )
-
-                                        source_file["modified_object_file_generation_return_code"] = (
-                                            object_file_generation_result.returncode
-                                        )
-
-                                        if os.path.exists(source_file["output_file"]):
-                                            new_mtime = os.path.getmtime(source_file["output_file"])
-                                            source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
+                                compilation_data = results
 
                             trigger_relinking = 0
                             for source_file in compilation_data:
@@ -459,45 +489,19 @@ def process_package(package, package_subdir):
                                                                     no_preclean=True)
 
                         if rebuild_returncode == 0:
-                            for source_file in compilation_data:
-                                if source_file['random_func_llvm_ir']:
-                                    injected_ir = ir_injection(
-                                        source_file['random_func_llvm_ir'],
-                                        injection_code='%nop_temp = add i32 0, 0')
-                                    source_file['random_func_llvm_ir'] = injected_ir
-                                if source_file['llvm_ir'] and source_file['random_func_llvm_ir']:
-                                    relinked_ir = ir_linker(
-                                        source_file['llvm_ir'],
-                                        source_file['random_func_llvm_ir'],
-                                        source_file['random_function_mangled']
-                                    )
-                                    source_file['relinked_llvm_ir'] = relinked_ir
+                            with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+                                futures = {executor.submit(process_modified_source_file, source_file): i
+                                        for i, source_file in enumerate(compilation_data)}
 
-                                    if (relinked_ir
-                                        and source_file["output_file"]
-                                        and os.path.exists(source_file["output_file"])):
+                                results = [None] * len(compilation_data)
+                                for future in as_completed(futures):
+                                    idx = futures[future]
+                                    try:
+                                        results[idx] = future.result()
+                                    except Exception as e:
+                                        results[idx] = compilation_data[idx]
 
-                                        original_mtime = os.path.getmtime(source_file["output_file"])
-
-                                        compilation_command_for_o = source_file["compiler_flags"].copy()
-                                        compilation_command_for_o[0] = "clang"
-
-                                        time.sleep(0.1)
-
-                                        object_file_generation_result = ir_to_o(
-                                            relinked_ir,
-                                            compilation_command_for_o,
-                                            source_file["output_file"],
-                                            source_file["directory"]
-                                        )
-
-                                        source_file["modified_object_file_generation_return_code"] = (
-                                            object_file_generation_result.returncode
-                                        )
-
-                                        if os.path.exists(source_file["output_file"]):
-                                            new_mtime = os.path.getmtime(source_file["output_file"])
-                                            source_file["modified_object_file_timestamp_check"] = new_mtime > original_mtime
+                                compilation_data = results
 
                             trigger_relinking = 0
                             for source_file in compilation_data:
