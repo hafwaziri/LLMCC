@@ -3,6 +3,8 @@ import os
 import subprocess
 import shutil
 from pathlib import Path
+import networkx as nx
+import re
 
 def generate_cfg(llvm_ir):
     tmp_dir = None
@@ -62,6 +64,53 @@ def print_cfg_details(llvm_ir):
             shutil.rmtree(tmp_dir)
         raise
 
+def parse_dot_to_graph(dot_content):
+    G = nx.DiGraph()
+
+    node_pattern = r'(Node0x[0-9a-f]+)\s*\[.*?label="(\{[^}]+\})'
+    for match in re.finditer(node_pattern, dot_content, re.DOTALL):
+        node_id = match.group(1)
+        label = match.group(2)
+        block_name_match = re.search(r'\{([^:\\]+)(?::|\\l)', label)
+        block_name = block_name_match.group(1).strip() if block_name_match else node_id
+        G.add_node(node_id, label=label, block_name=block_name)
+    
+    edge_pattern = r'(Node0x[0-9a-f]+)(?::\w+)?\s*->\s*(Node0x[0-9a-f]+)'
+    for match in re.finditer(edge_pattern, dot_content):
+        source = match.group(1)
+        target = match.group(2)
+        G.add_edge(source, target)
+    
+    return G
+
+def print_graph_info(G):
+    print(f"\n{'='*60}")
+    print(f"Graph Information")
+    print(f"{'='*60}")
+
+    print(f"\nGraph Statistics:")
+    print(f"  Nodes: {G.number_of_nodes()}")
+    print(f"  Edges: {G.number_of_edges()}")
+    print(f"  Is DAG: {nx.is_directed_acyclic_graph(G)}")
+
+    print(f"\nNodes (Basic Blocks):")
+    for node, attrs in G.nodes(data=True):
+        block_name = attrs.get('block_name', 'unknown')
+        print(f"  {node} -> Block: {block_name}")
+
+    print(f"\nEdges (Control Flow):")
+    for source, target in G.edges():
+        source_block = G.nodes[source].get('block_name', 'unknown')
+        target_block = G.nodes[target].get('block_name', 'unknown')
+        print(f"  {source_block} -> {target_block}")
+
+    print(f"\nGraph Properties:")
+    if G.number_of_nodes() > 0:
+        print(f"  Entry nodes (in-degree 0): {[G.nodes[n].get('block_name') for n in G.nodes() if G.in_degree(n) == 0]}")
+        print(f"  Exit nodes (out-degree 0): {[G.nodes[n].get('block_name') for n in G.nodes() if G.out_degree(n) == 0]}")
+
+    print(f"{'='*60}\n")
+
 if __name__ == "__main__":
     test_ir = """
     define i32 @factorial(i32 %n) {
@@ -80,4 +129,8 @@ if __name__ == "__main__":
     }
     """
 
-    print_cfg_details(test_ir)
+    cfg_data, tmp_dir = print_cfg_details(test_ir)
+
+    for func_name, dot_content in cfg_data.items():
+        G = parse_dot_to_graph(dot_content)
+        print_graph_info(G)
