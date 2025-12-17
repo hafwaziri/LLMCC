@@ -111,6 +111,28 @@ def print_graph_info(G):
 
     print(f"{'='*60}\n")
 
+def compare_cfgs(cfg1, cfg2):
+
+    is_isomorphic = nx.is_isomorphic(cfg1, cfg2)
+    result = {
+        'is_isomorphic': is_isomorphic,
+        'graph1_nodes': cfg1.number_of_nodes(),
+        'graph2_nodes': cfg2.number_of_nodes(),
+        'graph1_edges': cfg1.number_of_edges(),
+        'graph2_edges': cfg2.number_of_edges()
+    }
+
+    return result
+
+def print_comparison_results(result):
+    print(f"\n{'='*60}")
+    print(f"CFG Comparison Results")
+    print(f"{'='*60}")
+    print(f"  Graph 1 - Nodes: {result['graph1_nodes']}, Edges: {result['graph1_edges']}")
+    print(f"  Graph 2 - Nodes: {result['graph2_nodes']}, Edges: {result['graph2_edges']}")
+    print(f"  Structurally Isomorphic: {result['is_isomorphic']}")
+    print(f"{'='*60}\n")
+
 if __name__ == "__main__":
     test_ir = """
     define i32 @factorial(i32 %n) {
@@ -131,6 +153,16 @@ if __name__ == "__main__":
 
     cfg_data, tmp_dir = print_cfg_details(test_ir)
 
+    graphs = []
     for func_name, dot_content in cfg_data.items():
         G = parse_dot_to_graph(dot_content)
         print_graph_info(G)
+        graphs.append(G)
+
+    if len(graphs) >= 1:
+        result = compare_cfgs(graphs[0], graphs[0])
+        print_comparison_results(result)
+
+    if tmp_dir and os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
+
