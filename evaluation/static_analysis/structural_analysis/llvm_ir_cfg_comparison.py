@@ -6,6 +6,74 @@ from pathlib import Path
 import networkx as nx
 import re
 
+def _with_super_entry(G):
+    super_entry = "__super_entry__"
+    H = G.copy()
+    if super_entry in H:
+        i = 0
+        while f"{super_entry}{i}" in H:
+            i += 1
+        super_entry = f"{super_entry}{i}"
+    
+    entry_nodes = [n for n in H.nodes() if H.in_degree(n) == 0]
+    H.add_node(super_entry)
+
+    for n in entry_nodes:
+        H.add_edge(super_entry, n)
+    
+    return H, super_entry
+
+def loop_scc_count(G):
+    count = 0
+    for scc in nx.strongly_connected_components(G):
+        if len(scc) > 1:
+            count += 1
+        else:
+            (u,) = tuple(scc)
+            if G.has_edge(u, u):
+                count += 1
+    return count
+
+def cyclomatic_complexity(G):
+    n = G.number_of_nodes()
+    e = G.number_of_edges()
+    if n == 0:
+        return 0
+    p = nx.number_weakly_connected_components(G)
+    return e - n + 2 * p
+
+def dominator_tree_isomorphic(cfg1, cfg2):
+    if cfg1.number_of_nodes() == 0 or cfg2.number_of_nodes() == 0:
+        return None
+
+    try:
+        h1, start1 = _with_super_entry(cfg1)
+        h2, start2 = _with_super_entry(cfg2)
+
+        idom1 = nx.immediate_dominators(h1, start1)
+        idom2 = nx.immediate_dominators(h2, start2)
+
+        dom_g1 = nx.DiGraph()
+        dom_g2 = nx.DiGraph()
+
+        for node, idom in idom1.items():
+            if node != idom:
+                dom_g1.add_edge(idom, node)
+
+        for node, idom in idom2.items():
+            if node != idom:
+                dom_g2.add_edge(idom, node)
+
+        if start1 in dom_g1:
+            dom_g1.remove_node(start1)
+        if start2 in dom_g2:
+            dom_g2.remove_node(start2)
+
+        return nx.is_isomorphic(dom_g1, dom_g2)
+
+    except Exception:
+        return None
+
 def generate_cfg(llvm_ir):
     tmp_dir = None
     tmp_file_path = None
@@ -114,12 +182,34 @@ def print_graph_info(G):
 def compare_cfgs(cfg1, cfg2):
 
     is_isomorphic = nx.is_isomorphic(cfg1, cfg2)
+
+    complexity1 = cyclomatic_complexity(cfg1)
+    complexity2 = cyclomatic_complexity(cfg2)
+
+    loops1 = loop_scc_count(cfg1)
+    loops2 = loop_scc_count(cfg2)
+
+    dom_match = dominator_tree_isomorphic(cfg1, cfg2)
+
     result = {
         'is_isomorphic': is_isomorphic,
         'graph1_nodes': cfg1.number_of_nodes(),
         'graph2_nodes': cfg2.number_of_nodes(),
         'graph1_edges': cfg1.number_of_edges(),
-        'graph2_edges': cfg2.number_of_edges()
+        'graph2_edges': cfg2.number_of_edges(),
+        'cyclomatic_complexity_match': complexity1 == complexity2,
+        'complexity1': complexity1,
+        'complexity2': complexity2,
+        'loop_count_match': loops1 == loops2,
+        'loops1': loops1,
+        'loops2': loops2,
+        'dominator_tree_match': dom_match,
+        'definitive_match': (
+            is_isomorphic 
+            and complexity1 == complexity2 
+            and loops1 == loops2 
+            and (dom_match if dom_match is not None else True)
+        )
     }
 
     return result
@@ -130,8 +220,46 @@ def print_comparison_results(result):
     print(f"{'='*60}")
     print(f"  Graph 1 - Nodes: {result['graph1_nodes']}, Edges: {result['graph1_edges']}")
     print(f"  Graph 2 - Nodes: {result['graph2_nodes']}, Edges: {result['graph2_edges']}")
-    print(f"  Structurally Isomorphic: {result['is_isomorphic']}")
+    print(f"\n  Structural Isomorphism: {result['is_isomorphic']}")
+    print(f"  Cyclomatic Complexity Match: {result['cyclomatic_complexity_match']}")
+    print(f"    - Graph 1 Complexity: {result['complexity1']}")
+    print(f"    - Graph 2 Complexity: {result['complexity2']}")
+    print(f"  Loop Count Match: {result['loop_count_match']}")
+    print(f"    - Graph 1 Loops: {result['loops1']}")
+    print(f"    - Graph 2 Loops: {result['loops2']}")
+    print(f"  Dominator Tree Match: {result['dominator_tree_match']}")
+    print(f"\n  DEFINITIVE MATCH: {result['definitive_match']}")
     print(f"{'='*60}\n")
+
+def compare_llvm_ir_cfgs(llvm_ir1, llvm_ir2):
+    tmp_dir1 = None
+    tmp_dir2 = None
+
+    try:
+        cfg_data1, tmp_dir1 = generate_cfg(llvm_ir1)
+        cfg_data2, tmp_dir2 = generate_cfg(llvm_ir2)
+
+        graphs1 = {name: parse_dot_to_graph(dot) for name, dot in cfg_data1.items()}
+        graphs2 = {name: parse_dot_to_graph(dot) for name, dot in cfg_data2.items()}
+
+        common_functions = set(graphs1.keys()) & set(graphs2.keys())
+
+        comparison_results = {}
+        for func_name in common_functions:
+            comparison_results[func_name] = compare_cfgs(graphs1[func_name], graphs2[func_name])
+
+        return {
+            'comparisons': comparison_results,
+            'only_in_ir1': list(set(graphs1.keys()) - set(graphs2.keys())),
+            'only_in_ir2': list(set(graphs2.keys()) - set(graphs1.keys())),
+            'all_match': all(r['definitive_match'] for r in comparison_results.values()) if comparison_results else False
+        }
+
+    finally:
+        if tmp_dir1 and os.path.exists(tmp_dir1):
+            shutil.rmtree(tmp_dir1)
+        if tmp_dir2 and os.path.exists(tmp_dir2):
+            shutil.rmtree(tmp_dir2)
 
 if __name__ == "__main__":
     test_ir = """
