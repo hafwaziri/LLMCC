@@ -1,6 +1,7 @@
 import argparse
 import orjson
 from static_analysis.structural_analysis.llvm_ir_verification import verify_ir
+from static_analysis.structural_analysis.llvm_ir_diff import diff_llvm_ir
 
 def load_dataset(path, batch_size):
     batch = []
@@ -24,11 +25,35 @@ def process_batch(batch):
         ref_ir_verification, ref_ir_verification_message = verify_ir(ref_ir)
         tgt_ir_verification, tgt_ir_verification_message = verify_ir(tgt_ir)
 
+        if not ref_ir_verification or not tgt_ir_verification:
+            result = {
+                'id': i,
+                'ref_ir_verification': ref_ir_verification,
+                'ref_ir_verification_message': ref_ir_verification_message,
+                'tgt_ir_verification': tgt_ir_verification,
+                'tgt_ir_verification_message': tgt_ir_verification_message,
+                'identical': False,
+                'diff_stdout': "VERIFY FAILED",
+                'diff_stderr': "VERIFY FAILED",
+            }
+            results.append(result)
+            continue
+
+        # IR Diff
+        is_identical, diff_stdout, diff_stderr = diff_llvm_ir(ref_ir, tgt_ir)
+
         result = {
             'id': i,
             'ref_ir_verification': ref_ir_verification,
+            'ref_ir_verification_message': ref_ir_verification_message,
             'tgt_ir_verification': tgt_ir_verification,
+            'tgt_ir_verification_message': tgt_ir_verification_message,
+            'identical': is_identical,
+            'diff_stdout': diff_stdout,
+            'diff_stderr': diff_stderr,
         }
+
+
 
         results.append(result)
 
