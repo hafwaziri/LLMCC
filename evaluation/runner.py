@@ -2,6 +2,7 @@ import argparse
 import orjson
 from static_analysis.structural_analysis.llvm_ir_verification import verify_ir
 from static_analysis.structural_analysis.llvm_ir_diff import diff_llvm_ir
+from static_analysis.structural_analysis.llvm_ir_canonicalization_and_normalization import canonicalize_and_normalize_ir
 
 def load_dataset(path, batch_size):
     batch = []
@@ -32,15 +33,41 @@ def process_batch(batch):
                 'ref_ir_verification_message': ref_ir_verification_message,
                 'tgt_ir_verification': tgt_ir_verification,
                 'tgt_ir_verification_message': tgt_ir_verification_message,
+                'ref_canonicalization': False,
+                'ref_canonicalization_error': "VERIFY FAILED",
+                'tgt_canonicalization': False,
+                'tgt_canonicalization_error': "VERIFY FAILED",
                 'identical': False,
                 'diff_stdout': "VERIFY FAILED",
                 'diff_stderr': "VERIFY FAILED",
             }
             results.append(result)
             continue
+        
+        # Canonicalize and Normalize IR
+        ref_canon_success, ref_canon_ir, ref_canon_error = canonicalize_and_normalize_ir(ref_ir)
+        tgt_canon_success, tgt_canon_ir, tgt_canon_error = canonicalize_and_normalize_ir(tgt_ir)
+
+        if not ref_canon_success or not tgt_canon_success:
+            result = {
+                'id': i,
+                'ref_ir_verification': ref_ir_verification,
+                'ref_ir_verification_message': ref_ir_verification_message,
+                'tgt_ir_verification': tgt_ir_verification,
+                'tgt_ir_verification_message': tgt_ir_verification_message,
+                'ref_canonicalization': ref_canon_success,
+                'ref_canonicalization_error': ref_canon_error,
+                'tgt_canonicalization': tgt_canon_success,
+                'tgt_canonicalization_error': tgt_canon_error,
+                'identical': False,
+                'diff_stdout': "CANONICALIZATION FAILED",
+                'diff_stderr': "CANONICALIZATION FAILED",
+            }
+            results.append(result)
+            continue
 
         # IR Diff
-        is_identical, diff_stdout, diff_stderr = diff_llvm_ir(ref_ir, tgt_ir)
+        is_identical, diff_stdout, diff_stderr = diff_llvm_ir(ref_canon_ir, tgt_canon_ir)
 
         result = {
             'id': i,
@@ -48,6 +75,10 @@ def process_batch(batch):
             'ref_ir_verification_message': ref_ir_verification_message,
             'tgt_ir_verification': tgt_ir_verification,
             'tgt_ir_verification_message': tgt_ir_verification_message,
+            'ref_canonicalization': ref_canon_success,
+            'ref_canonicalization_error': ref_canon_error,
+            'tgt_canonicalization': tgt_canon_success,
+            'tgt_canonicalization_error': tgt_canon_error,
             'identical': is_identical,
             'diff_stdout': diff_stdout,
             'diff_stderr': diff_stderr,
