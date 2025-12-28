@@ -3,6 +3,7 @@ import orjson
 from static_analysis.structural_analysis.llvm_ir_verification import verify_ir
 from static_analysis.structural_analysis.llvm_ir_diff import diff_llvm_ir
 from static_analysis.structural_analysis.llvm_ir_canonicalization_and_normalization import canonicalize_and_normalize_ir
+from static_analysis.structural_analysis.llvm_ir_function_analysis import functions_count
 
 def load_dataset(path, batch_size):
     batch = []
@@ -40,6 +41,8 @@ def process_batch(batch):
                 'identical': False,
                 'diff_stdout': "VERIFY FAILED",
                 'diff_stderr': "VERIFY FAILED",
+                'function_count_match': False,
+                'function_signature_match': False,
             }
             results.append(result)
             continue
@@ -62,9 +65,14 @@ def process_batch(batch):
                 'identical': False,
                 'diff_stdout': "CANONICALIZATION FAILED",
                 'diff_stderr': "CANONICALIZATION FAILED",
+                'function_count_match': False,
+                'function_signature_match': False,
             }
             results.append(result)
             continue
+
+        # Function Analysis
+        func_analysis = functions_count(ref_canon_ir, tgt_canon_ir)
 
         # IR Diff
         is_identical, diff_stdout, diff_stderr = diff_llvm_ir(ref_canon_ir, tgt_canon_ir)
@@ -82,9 +90,9 @@ def process_batch(batch):
             'identical': is_identical,
             'diff_stdout': diff_stdout,
             'diff_stderr': diff_stderr,
+            'function_count_match': func_analysis.get('count_match', False),
+            'function_signature_match': func_analysis.get('signature_match', False),
         }
-
-
 
         results.append(result)
 
