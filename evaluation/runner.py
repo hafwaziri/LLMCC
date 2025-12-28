@@ -5,6 +5,7 @@ from static_analysis.structural_analysis.llvm_ir_diff import diff_llvm_ir
 from static_analysis.structural_analysis.llvm_ir_canonicalization_and_normalization import canonicalize_and_normalize_ir
 from static_analysis.structural_analysis.llvm_ir_function_analysis import functions_count
 from static_analysis.structural_analysis.llvm_ir_cfg_comparison import compare_llvm_ir_cfgs
+from static_analysis.semantic_analysis.llvm_ir_alive2_test_harness import verify_with_alive2
 
 def load_dataset(path, batch_size):
     batch = []
@@ -52,6 +53,9 @@ def process_batch(batch):
                 'cfg_edges_match': False,
                 'cfg_similarity_score': 0.0,
                 'cfg_definitive_match': False,
+                'alive2_verified': False,
+                'alive2_stdout': "VERIFY FAILED",
+                'alive2_stderr': "VERIFY FAILED",
             }
             results.append(result)
             continue
@@ -84,6 +88,9 @@ def process_batch(batch):
                 'cfg_edges_match': False,
                 'cfg_similarity_score': 0.0,
                 'cfg_definitive_match': False,
+                'alive2_verified': False,
+                'alive2_stdout': "CANONICALIZATION FAILED",
+                'alive2_stderr': "CANONICALIZATION FAILED",
             }
             results.append(result)
             continue
@@ -129,6 +136,14 @@ def process_batch(batch):
             cfg_edges_match = False
             cfg_similarity_score = 0.0
             cfg_definitive_match = False
+        
+        # Alive2 Verification
+        try:
+            alive2_verified, alive2_stdout, alive2_stderr = verify_with_alive2(ref_canon_ir, tgt_canon_ir)
+        except Exception as e:
+            alive2_verified = False
+            alive2_stdout = ""
+            alive2_stderr = f"Alive2 verification error: {str(e)}"
 
         result = {
             'id': i,
@@ -153,6 +168,9 @@ def process_batch(batch):
             'cfg_edges_match': cfg_edges_match,
             'cfg_similarity_score': cfg_similarity_score,
             'cfg_definitive_match': cfg_definitive_match,
+            'alive2_verified': alive2_verified,
+            'alive2_stdout': alive2_stdout,
+            'alive2_stderr': alive2_stderr,
         }
 
         results.append(result)
