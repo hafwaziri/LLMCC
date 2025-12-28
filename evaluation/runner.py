@@ -1,5 +1,6 @@
 import argparse
 import orjson
+import os
 from static_analysis.structural_analysis.llvm_ir_verification import verify_ir
 from static_analysis.structural_analysis.llvm_ir_diff import diff_llvm_ir
 from static_analysis.structural_analysis.llvm_ir_canonicalization_and_normalization import canonicalize_and_normalize_ir
@@ -7,6 +8,8 @@ from static_analysis.structural_analysis.llvm_ir_function_analysis import functi
 from static_analysis.structural_analysis.llvm_ir_cfg_comparison import compare_llvm_ir_cfgs
 from static_analysis.semantic_analysis.llvm_ir_alive2_test_harness import verify_with_alive2
 from functional_and_behavioural_analysis.llvm_ir_compilation_check import compilation_check
+from functional_and_behavioural_analysis.llvm_ir_io_test import io_test
+
 
 def load_dataset(path, batch_size):
     batch = []
@@ -19,7 +22,7 @@ def load_dataset(path, batch_size):
         if batch:
             yield batch
 
-def process_batch(batch, compilation_command=None, output_file=None, src_directory=None):
+def process_batch(batch, compilation_command=None, output_file=None, src_directory=None, io_timeout=60):
     results = []
     for i, item in enumerate(batch):
         src = item["src"]
@@ -59,6 +62,11 @@ def process_batch(batch, compilation_command=None, output_file=None, src_directo
                 'alive2_stderr': "VERIFY FAILED",
                 'ref_compilation_success': False,
                 'tgt_compilation_success': False,
+                'io_both_executed': False,
+                'io_stdout_match': False,
+                'io_stderr_match': False,
+                'io_returncode_match': False,
+                'io_match': False,
             }
             results.append(result)
             continue
@@ -96,6 +104,11 @@ def process_batch(batch, compilation_command=None, output_file=None, src_directo
                 'alive2_stderr': "CANONICALIZATION FAILED",
                 'ref_compilation_success': False,
                 'tgt_compilation_success': False,
+                'io_both_executed': False,
+                'io_stdout_match': False,
+                'io_stderr_match': False,
+                'io_returncode_match': False,
+                'io_match': False,
             }
             results.append(result)
             continue
@@ -153,26 +166,58 @@ def process_batch(batch, compilation_command=None, output_file=None, src_directo
         # Compilation Check
         ref_compilation_success = False
         tgt_compilation_success = False
+        ref_executable = None
+        tgt_executable = None
 
         if compilation_command and output_file:
             try:
+                ref_output = "ref_" + output_file
                 ref_compilation_success = compilation_check(
                     ref_canon_ir,
                     compilation_command,
-                    output_file,
+                    ref_output,
                     src_directory
                 )
 
                 if ref_compilation_success:
+                    ref_executable = os.path.join(src_directory, ref_output) if src_directory else ref_output
+
+                    tgt_output = "tgt_" + output_file
                     tgt_compilation_success = compilation_check(
                         tgt_canon_ir,
                         compilation_command,
-                        output_file,
+                        tgt_output,
                         src_directory
                     )
+
+                    if tgt_compilation_success:
+                        tgt_executable = os.path.join(src_directory, tgt_output) if src_directory else tgt_output
             except Exception as e:
                 ref_compilation_success = False
                 tgt_compilation_success = False
+
+        # I/O Testing
+        io_both_executed = False
+        io_stdout_match = False
+        io_stderr_match = False
+        io_returncode_match = False
+        io_match = False
+
+        if ref_compilation_success and tgt_compilation_success and ref_executable and tgt_executable:
+            try:
+                io_result = io_test(ref_executable, tgt_executable, io_timeout)
+
+                io_both_executed = io_result.get('both_executed', False)
+                io_stdout_match = io_result.get('stdout_match', False)
+                io_stderr_match = io_result.get('stderr_match', False)
+                io_returncode_match = io_result.get('returncode_match', False)
+                io_match = io_result.get('match', False)
+            except Exception as e:
+                io_both_executed = False
+                io_stdout_match = False
+                io_stderr_match = False
+                io_returncode_match = False
+                io_match = False
 
         result = {
             'id': i,
@@ -202,6 +247,11 @@ def process_batch(batch, compilation_command=None, output_file=None, src_directo
             'alive2_stderr': alive2_stderr,
             'ref_compilation_success': ref_compilation_success,
             'tgt_compilation_success': tgt_compilation_success,
+            'io_both_executed': io_both_executed,
+            'io_stdout_match': io_stdout_match,
+            'io_stderr_match': io_stderr_match,
+            'io_returncode_match': io_returncode_match,
+            'io_match': io_match,
         }
 
         results.append(result)
@@ -209,8 +259,16 @@ def process_batch(batch, compilation_command=None, output_file=None, src_directo
     return results
 
 def main(args):
+    compilation_command = args.compilation_command.split() if args.compilation_command else None
+
     for batch in load_dataset(args.dataset, args.batch_size):
-        process_batch(batch)
+        process_batch(
+            batch,
+            compilation_command=compilation_command,
+            output_file=args.output_file,
+            src_directory=args.src_directory,
+            io_timeout=args.io_timeout
+        )
 
 
 if __name__ == "__main__":
@@ -221,6 +279,7 @@ if __name__ == "__main__":
     parser.add_argument('--compilation_command', type=str, default=None, help='Compilation command (space-separated)')
     parser.add_argument('--output_file', type=str, default=None)
     parser.add_argument('--src_directory', type=str, default=None)
+    parser.add_argument('--io_timeout', type=int, default=60)
 
     args = parser.parse_args()
 
