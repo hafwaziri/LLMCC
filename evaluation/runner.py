@@ -4,6 +4,7 @@ from static_analysis.structural_analysis.llvm_ir_verification import verify_ir
 from static_analysis.structural_analysis.llvm_ir_diff import diff_llvm_ir
 from static_analysis.structural_analysis.llvm_ir_canonicalization_and_normalization import canonicalize_and_normalize_ir
 from static_analysis.structural_analysis.llvm_ir_function_analysis import functions_count
+from static_analysis.structural_analysis.llvm_ir_cfg_comparison import compare_llvm_ir_cfgs
 
 def load_dataset(path, batch_size):
     batch = []
@@ -43,6 +44,14 @@ def process_batch(batch):
                 'diff_stderr': "VERIFY FAILED",
                 'function_count_match': False,
                 'function_signature_match': False,
+                'cfg_isomorphic_match': False,
+                'cfg_loop_count_match': False,
+                'cfg_complexity_match': False,
+                'cfg_dominator_match': False,
+                'cfg_nodes_match': False,
+                'cfg_edges_match': False,
+                'cfg_similarity_score': 0.0,
+                'cfg_definitive_match': False,
             }
             results.append(result)
             continue
@@ -67,6 +76,14 @@ def process_batch(batch):
                 'diff_stderr': "CANONICALIZATION FAILED",
                 'function_count_match': False,
                 'function_signature_match': False,
+                'cfg_isomorphic_match': False,
+                'cfg_loop_count_match': False,
+                'cfg_complexity_match': False,
+                'cfg_dominator_match': False,
+                'cfg_nodes_match': False,
+                'cfg_edges_match': False,
+                'cfg_similarity_score': 0.0,
+                'cfg_definitive_match': False,
             }
             results.append(result)
             continue
@@ -76,6 +93,42 @@ def process_batch(batch):
 
         # IR Diff
         is_identical, diff_stdout, diff_stderr = diff_llvm_ir(ref_canon_ir, tgt_canon_ir)
+
+        # CFG Comparison
+        try:
+            cfg_comparison = compare_llvm_ir_cfgs(ref_canon_ir, tgt_canon_ir)
+            
+            # Aggregate metrics across all functions
+            comparisons = cfg_comparison.get('comparisons', {})
+            
+            if comparisons:
+                cfg_isomorphic = all(r.get('is_isomorphic', False) for r in comparisons.values())
+                cfg_loop_match = all(r.get('loop_count_match', False) for r in comparisons.values())
+                cfg_complexity_match = all(r.get('cyclomatic_complexity_match', False) for r in comparisons.values())
+                cfg_dominator_match = all(r.get('dominator_tree_match', False) for r in comparisons.values() if r.get('dominator_tree_match') is not None)
+                cfg_nodes_match = all(r.get('graph1_nodes') == r.get('graph2_nodes') for r in comparisons.values())
+                cfg_edges_match = all(r.get('graph1_edges') == r.get('graph2_edges') for r in comparisons.values())
+                cfg_similarity_score = cfg_comparison.get('all_similarity_avg', 0.0) or 0.0
+                cfg_definitive_match = cfg_comparison.get('all_match', False)
+            else:
+                cfg_isomorphic = False
+                cfg_loop_match = False
+                cfg_complexity_match = False
+                cfg_dominator_match = False
+                cfg_nodes_match = False
+                cfg_edges_match = False
+                cfg_similarity_score = 0.0
+                cfg_definitive_match = False
+                
+        except Exception:
+            cfg_isomorphic = False
+            cfg_loop_match = False
+            cfg_complexity_match = False
+            cfg_dominator_match = False
+            cfg_nodes_match = False
+            cfg_edges_match = False
+            cfg_similarity_score = 0.0
+            cfg_definitive_match = False
 
         result = {
             'id': i,
@@ -92,6 +145,14 @@ def process_batch(batch):
             'diff_stderr': diff_stderr,
             'function_count_match': func_analysis.get('count_match', False),
             'function_signature_match': func_analysis.get('signature_match', False),
+            'cfg_isomorphic_match': cfg_isomorphic,
+            'cfg_loop_count_match': cfg_loop_match,
+            'cfg_complexity_match': cfg_complexity_match,
+            'cfg_dominator_match': cfg_dominator_match,
+            'cfg_nodes_match': cfg_nodes_match,
+            'cfg_edges_match': cfg_edges_match,
+            'cfg_similarity_score': cfg_similarity_score,
+            'cfg_definitive_match': cfg_definitive_match,
         }
 
         results.append(result)
