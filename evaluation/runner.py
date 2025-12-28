@@ -6,6 +6,7 @@ from static_analysis.structural_analysis.llvm_ir_canonicalization_and_normalizat
 from static_analysis.structural_analysis.llvm_ir_function_analysis import functions_count
 from static_analysis.structural_analysis.llvm_ir_cfg_comparison import compare_llvm_ir_cfgs
 from static_analysis.semantic_analysis.llvm_ir_alive2_test_harness import verify_with_alive2
+from functional_and_behavioural_analysis.llvm_ir_compilation_check import compilation_check
 
 def load_dataset(path, batch_size):
     batch = []
@@ -18,7 +19,7 @@ def load_dataset(path, batch_size):
         if batch:
             yield batch
 
-def process_batch(batch):
+def process_batch(batch, compilation_command=None, output_file=None, src_directory=None):
     results = []
     for i, item in enumerate(batch):
         src = item["src"]
@@ -56,6 +57,8 @@ def process_batch(batch):
                 'alive2_verified': False,
                 'alive2_stdout': "VERIFY FAILED",
                 'alive2_stderr': "VERIFY FAILED",
+                'ref_compilation_success': False,
+                'tgt_compilation_success': False,
             }
             results.append(result)
             continue
@@ -91,6 +94,8 @@ def process_batch(batch):
                 'alive2_verified': False,
                 'alive2_stdout': "CANONICALIZATION FAILED",
                 'alive2_stderr': "CANONICALIZATION FAILED",
+                'ref_compilation_success': False,
+                'tgt_compilation_success': False,
             }
             results.append(result)
             continue
@@ -104,10 +109,10 @@ def process_batch(batch):
         # CFG Comparison
         try:
             cfg_comparison = compare_llvm_ir_cfgs(ref_canon_ir, tgt_canon_ir)
-            
+
             # Aggregate metrics across all functions
             comparisons = cfg_comparison.get('comparisons', {})
-            
+
             if comparisons:
                 cfg_isomorphic = all(r.get('is_isomorphic', False) for r in comparisons.values())
                 cfg_loop_match = all(r.get('loop_count_match', False) for r in comparisons.values())
@@ -126,7 +131,7 @@ def process_batch(batch):
                 cfg_edges_match = False
                 cfg_similarity_score = 0.0
                 cfg_definitive_match = False
-                
+
         except Exception:
             cfg_isomorphic = False
             cfg_loop_match = False
@@ -136,7 +141,7 @@ def process_batch(batch):
             cfg_edges_match = False
             cfg_similarity_score = 0.0
             cfg_definitive_match = False
-        
+
         # Alive2 Verification
         try:
             alive2_verified, alive2_stdout, alive2_stderr = verify_with_alive2(ref_canon_ir, tgt_canon_ir)
@@ -144,6 +149,30 @@ def process_batch(batch):
             alive2_verified = False
             alive2_stdout = ""
             alive2_stderr = f"Alive2 verification error: {str(e)}"
+
+        # Compilation Check
+        ref_compilation_success = False
+        tgt_compilation_success = False
+
+        if compilation_command and output_file:
+            try:
+                ref_compilation_success = compilation_check(
+                    ref_canon_ir,
+                    compilation_command,
+                    output_file,
+                    src_directory
+                )
+
+                if ref_compilation_success:
+                    tgt_compilation_success = compilation_check(
+                        tgt_canon_ir,
+                        compilation_command,
+                        output_file,
+                        src_directory
+                    )
+            except Exception as e:
+                ref_compilation_success = False
+                tgt_compilation_success = False
 
         result = {
             'id': i,
@@ -171,6 +200,8 @@ def process_batch(batch):
             'alive2_verified': alive2_verified,
             'alive2_stdout': alive2_stdout,
             'alive2_stderr': alive2_stderr,
+            'ref_compilation_success': ref_compilation_success,
+            'tgt_compilation_success': tgt_compilation_success,
         }
 
         results.append(result)
@@ -187,6 +218,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--dataset', type=str, required=True)
     parser.add_argument('--batch_size', type=str, default=100)
+    parser.add_argument('--compilation_command', type=str, default=None, help='Compilation command (space-separated)')
+    parser.add_argument('--output_file', type=str, default=None)
+    parser.add_argument('--src_directory', type=str, default=None)
 
     args = parser.parse_args()
 
