@@ -2,6 +2,9 @@ import argparse
 import docker
 import os
 import json
+import tempfile
+import subprocess
+import re
 from pathlib import Path
 
 def find_source_files(dataset_path):
@@ -9,6 +12,52 @@ def find_source_files(dataset_path):
     for ext in ['*.c', '*.cpp']:
         source_files.extend(Path(dataset_path).rglob(ext))
     return [str(f) for f in source_files]
+
+def preprocess_llvm_ir(llvm_ir: str):
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ll", delete=False) as temp_ir:
+        temp_ir.write(llvm_ir)
+        temp_ir.flush()
+        temp_ir_path = temp_ir.name
+
+    try:
+        opt_command = [
+            "opt",
+            "--strip-debug",
+            "--strip-named-metadata",
+            "-S",
+            temp_ir_path,
+            "-o",
+            temp_ir_path,
+        ]
+        debug_stripped = subprocess.run(
+            opt_command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        if debug_stripped.returncode != 0:
+            err = (debug_stripped.stderr or debug_stripped.stdout or "").strip()
+            print(f"    opt preprocessing failed: {err or 'No output captured'}")
+            return None
+
+        with open(temp_ir_path, "r", encoding="utf-8", errors="replace") as f:
+            processed = f.read()
+
+        processed = re.sub(r"^; ModuleID = .*$\n?", "", processed, flags=re.MULTILINE)
+        processed = re.sub(r"^source_filename = .*$\n?", "", processed, flags=re.MULTILINE)
+        processed = re.sub(r"^target datalayout = .*$\n?", "", processed, flags=re.MULTILINE)
+        processed = re.sub(r"^target triple = .*$\n?", "", processed, flags=re.MULTILINE)
+
+        return processed
+    except FileNotFoundError:
+        print("    opt preprocessing failed: `opt` not found on host PATH")
+        return None
+    finally:
+        try:
+            os.unlink(temp_ir_path)
+        except OSError:
+            pass
 
 def compile_to_llvm_ir(container, source_file, dataset_path):
     rel_path = os.path.relpath(source_file, dataset_path)
@@ -94,21 +143,28 @@ def process_dataset(docker_image, dataset_path, output_file):
                 continue
 
             llvm_ir = compile_to_llvm_ir(container, source_file, dataset_path)
-
-            if llvm_ir:
-                results.append({
-                    'file_path': rel_path,
-                    'src': source_code,
-                    'ref_ir': llvm_ir
-                })
-                success_count += 1
-                if ext == ".c":
-                    success_c += 1
-                elif ext == ".cpp":
-                    success_cpp += 1
-                print(f"    Successfully compiled")
-            else:
+            if not llvm_ir:
                 print(f"    Failed to compile")
+                continue
+
+            processed_ir = preprocess_llvm_ir(llvm_ir)
+            if not processed_ir:
+                print(f"    Failed to preprocess LLVM IR")
+                continue
+
+            results.append(
+                {
+                    "file_path": rel_path,
+                    "src": source_code,
+                    "ref_ir": processed_ir,
+                }
+            )
+            success_count += 1
+            if ext == ".c":
+                success_c += 1
+            elif ext == ".cpp":
+                success_cpp += 1
+            print(f"    Successfully compiled + preprocessed")
 
         print(f"Saving results to: {output_file}")
         os.makedirs(os.path.dirname(output_file) if os.path.dirname(output_file) else '.', exist_ok=True)
