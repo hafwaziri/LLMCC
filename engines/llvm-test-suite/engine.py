@@ -59,6 +59,30 @@ def preprocess_llvm_ir(llvm_ir: str):
         except OSError:
             pass
 
+def preprocess_source_strip_comments(container, source_file, dataset_path):
+    rel_path = os.path.relpath(source_file, dataset_path)
+    container_file_path = f"/dataset/{rel_path}"
+    container_dir = os.path.dirname(container_file_path)
+    file_name = os.path.basename(container_file_path)
+
+    cmd = ["gcc", "-fpreprocessed", "-dD", "-E", "-P", file_name]
+
+    try:
+        exec_result = container.exec_run(cmd, demux=True, workdir=container_dir)
+        stdout, stderr = exec_result.output
+
+        if exec_result.exit_code != 0:
+            err = stderr.decode("utf-8", errors="replace") if stderr else ""
+            out = stdout.decode("utf-8", errors="replace") if stdout else ""
+            msg = (err.strip() or out.strip() or "No output captured")
+            print(f"    Source comment-stripping failed (exit {exec_result.exit_code}): {msg}")
+            return None
+
+        return stdout.decode("utf-8", errors="replace") if stdout else ""
+    except Exception as e:
+        print(f"    Source comment-stripping exception: {str(e)}")
+        return None
+
 def compile_to_llvm_ir(container, source_file, dataset_path):
     rel_path = os.path.relpath(source_file, dataset_path)
     container_file_path = f"/dataset/{rel_path}"
@@ -137,10 +161,12 @@ def process_dataset(docker_image, dataset_path, output_file):
 
             try:
                 with open(source_file, 'r') as f:
-                    source_code = f.read()
+                    source_code_raw = f.read()
             except Exception as e:
                 print(f"    Failed to read file: {str(e)}")
                 continue
+
+            source_code = preprocess_source_strip_comments(container, source_file, dataset_path) or source_code_raw
 
             llvm_ir = compile_to_llvm_ir(container, source_file, dataset_path)
             if not llvm_ir:
