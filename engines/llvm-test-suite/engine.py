@@ -6,6 +6,9 @@ import tempfile
 import subprocess
 import re
 from pathlib import Path
+import warnings
+import logging
+from transformers import AutoTokenizer
 
 def find_source_files(dataset_path):
     source_files = []
@@ -119,10 +122,38 @@ def compile_to_llvm_ir(container, source_file, dataset_path):
         print(f"    Exception: {str(e)}")
         return None
 
-def process_dataset(docker_image, dataset_path, output_file):
+def chat_full_text(tokenizer, system_prompt, source, target):
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": source},
+        {"role": "assistant", "content": target},
+    ]
+    if hasattr(tokenizer, "apply_chat_template"):
+        return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+    return f"{system_prompt}\n\n[USER]\n{source}\n\n[ASSISTANT]\n{target}\n"
+
+def num_tokens(tokenizer, text):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        toks = tokenizer(text, add_special_tokens=False, truncation=False)
+    return len(toks.get("input_ids", []))
+
+def process_dataset(docker_image, dataset_path, output_file, *, max_tokens=None, tokenizer_model=None, system_prompt=None):
     client = docker.from_env()
 
     dataset_path = os.path.abspath(dataset_path)
+
+    tokenizer = None
+    if max_tokens is not None:
+        if not tokenizer_model:
+            raise ValueError("max_tokens was provided but tokenizer_model is missing")
+        print(f"Loading tokenizer: {tokenizer_model}")
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_model, trust_remote_code=True)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = "<|endoftext|>"
+            tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids("<|endoftext|>")
+        system_prompt = system_prompt or "You are a compiler expert. Convert the following source code to LLVM IR."
+        print(f"Filtering enabled: keeping samples with <= {max_tokens} tokens")
 
     print(f"Starting Docker container from image: {docker_image}")
 
@@ -148,6 +179,7 @@ def process_dataset(docker_image, dataset_path, output_file):
         total_cpp = 0
         success_c = 0
         success_cpp = 0
+        filtered_out = 0
 
         for idx, source_file in enumerate(source_files, 1):
             rel_path = os.path.relpath(source_file, dataset_path)
@@ -178,6 +210,14 @@ def process_dataset(docker_image, dataset_path, output_file):
                 print(f"    Failed to preprocess LLVM IR")
                 continue
 
+            if max_tokens is not None:
+                full_text = chat_full_text(tokenizer, system_prompt, source_code, processed_ir)
+                n_tok = num_tokens(tokenizer, full_text)
+                if n_tok > max_tokens:
+                    filtered_out += 1
+                    print(f"    Filtered out (tokens={n_tok} > {max_tokens})")
+                    continue
+
             results.append(
                 {
                     "file_path": rel_path,
@@ -201,9 +241,12 @@ def process_dataset(docker_image, dataset_path, output_file):
 
         print(f"\n{'='*60}")
         print(f"Processing complete!")
-        print(f"Successfully compiled: {success_count}/{len(source_files)} files")
-        print(f"  C files:   {success_c}/{total_c} compiled")
-        print(f"  C++ files: {success_cpp}/{total_cpp} compiled")
+        print(f"Successfully kept: {success_count}/{len(source_files)} files")
+        if max_tokens is not None:
+            print(f"Filtered out (too long): {filtered_out}")
+            print(f"Max tokens: {max_tokens} (tokenizer={tokenizer_model})")
+        print(f"  C files:   {success_c}/{total_c} kept")
+        print(f"  C++ files: {success_cpp}/{total_cpp} kept")
         print(f"Output saved to: {output_file}")
         print(f"{'='*60}")
 
@@ -212,7 +255,14 @@ def process_dataset(docker_image, dataset_path, output_file):
         container.stop()
 
 def main(args):
-    process_dataset(args.docker_image, args.raw_dataset_path, args.output_file)
+    process_dataset(
+        args.docker_image,
+        args.raw_dataset_path,
+        args.output_file,
+        max_tokens=args.max_tokens,
+        tokenizer_model=args.tokenizer_model,
+        system_prompt=args.system_prompt
+        )
 
 
 if __name__ == "__main__":
@@ -221,6 +271,10 @@ if __name__ == "__main__":
     parser.add_argument('--raw_dataset_path', type=str, required=True)
     parser.add_argument('--docker_image', type=str, required=True)
     parser.add_argument('--output_file', type=str, required=True)
+
+    parser.add_argument('--max_tokens', type=int, default=None)
+    parser.add_argument('--tokenizer_model', type=str, default="Qwen/Qwen2.5-Coder-0.5B-Instruct")
+    parser.add_argument('--system_prompt', type=str, default="You are a compiler expert. Convert the following source code to LLVM IR.")
 
     args = parser.parse_args()
 
